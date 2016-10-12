@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace JacobC.MusicTools.Crawlers
+namespace JacobC.Music.Crawlers
 {
     /// <summary>
     /// 用来记录日志的代理方法
@@ -16,9 +16,13 @@ namespace JacobC.MusicTools.Crawlers
         /// 爬虫日志的记录服务
         /// </summary>
         public event LogDelegate LogService;
-        protected void Log(string message)
+        protected virtual void Log(string message)
         {
             LogService?.Invoke(message);
         }
+        /// <summary>
+        /// 开始抓取
+        /// </summary>
+        public abstract Task StartCrawling();
     }
 }

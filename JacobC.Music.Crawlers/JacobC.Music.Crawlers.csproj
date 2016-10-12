@@ -4,17 +4,15 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{80306FE2-A609-49DA-B06E-B503F25EF0D9}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <ProjectGuid>{AF7E1DE2-9B5D-448E-9526-ECFBA7740A21}</ProjectGuid>
+    <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>JacobC.Music.Crawlers.Test</RootNamespace>
-    <AssemblyName>JacobC.Music.Crawlers.Test</AssemblyName>
+    <RootNamespace>JacobC.Music.Crawlers</RootNamespace>
+    <AssemblyName>JacobC.Music.Crawlers</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -24,7 +22,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
@@ -51,18 +48,17 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Program.cs" />
+    <Compile Include="Astost\AstostCrawler.cs" />
+    <Compile Include="Astost\AstostParser.cs" />
+    <Compile Include="Astost\AstostPostInfo.cs" />
+    <Compile Include="Crawler.cs" />
+    <Compile Include="ExtensionMethods.cs" />
+    <Compile Include="ICrawlerWriter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="App.config" />
+    <None Include="app.config" />
     <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\JacobC.Music.Crawlers\JacobC.Music.Crawlers.csproj">
-      <Project>{af7e1de2-9b5d-448e-9526-ecfba7740a21}</Project>
-      <Name>JacobC.Music.Crawlers</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
