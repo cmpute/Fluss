@@ -1,0 +1,23 @@
+﻿<Window x:Class="TestUI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TestUI"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="350" Width="525"
+        Loaded="Window_Loaded">
+    <Grid>
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="200">
+            <Image x:Name="VerifyImage"/>
+            <TextBox x:Name="Username" Text="用户名"/>
+            <PasswordBox x:Name="Password"  InputScope="Password"/>
+            <TextBox x:Name="Code" Text="验证码"/>
+            <StackPanel Orientation="Horizontal">
+                <Button Content="登录" Click="Button_Click"/>
+                <Button Content="退出" Click="Button_Click_1"/>
+            </StackPanel>
+            <TextBlock x:Name="Status"/>
+        </StackPanel>
+    </Grid>
+</Window>

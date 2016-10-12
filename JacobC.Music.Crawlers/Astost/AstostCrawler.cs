@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Net;
 using System.Net.Http;
+using System.IO;
 using HtmlAgilityPack;
 
 namespace JacobC.Music.Crawlers.Astost
@@ -14,10 +15,10 @@ namespace JacobC.Music.Crawlers.Astost
     public class AstostCrawler : Crawler
     {
         #region .ctor And Fields
-        const string Domain = "https://www.astost.com";
+        const string Domain = "https://www.astost.com/bbs/";
 
-        bool? _loggedin;
         uint _startid;
+        bool _savecookie;
         ICrawlerWriter<AstostPostInfo> _writer;
         HttpClient _client;
         HttpClient _Client
@@ -30,10 +31,16 @@ namespace JacobC.Music.Crawlers.Astost
             }
         }
 
-        public AstostCrawler(ICrawlerWriter<AstostPostInfo> writer, uint startId = 0)
+        public AstostCrawler(ICrawlerWriter<AstostPostInfo> writer, uint startId = 0, bool savecookie = false)
         {
             _startid = startId;
             _writer = writer;
+            _savecookie = savecookie;
+        }
+        ~AstostCrawler()
+        {
+            if (!_savecookie)
+                Logout();
         }
         #endregion
 
@@ -76,47 +83,63 @@ namespace JacobC.Music.Crawlers.Astost
         }
         #endregion
 
+        #region Login Session
+
+        bool? _loggedin;
+        string _logouturl;
+
         public async Task<bool> CheckLogin()
         {
             if (!_loggedin.HasValue)
             {
-                var response = await _Client.GetStringAsync(Domain + "/bbs/");
+                var response = await _Client.GetStringAsync(Domain);
                 _loggedin = response.IndexOf("register.php") < 0;
             }
             return _loggedin.Value;
         }
 
         /// <summary>
+        /// 获取验证码图片的文件流
+        /// </summary>
+        public async Task<Stream> GetVerifyCode()
+        {
+            int timestamp = (int)((DateTime.Now - new DateTime(1970, 1, 1).ToLocalTime()).TotalSeconds);
+            var imgrequest = new HttpRequestMessage(HttpMethod.Get, Domain + "ck.php?nowtime=" + timestamp);
+            imgrequest.Headers.Accept.ParseAdd("image/webp,image/*,*/*;q=0.8");
+            var imgresponse = await _Client.SendAsync(imgrequest);
+            return await imgresponse.Content.ReadAsStreamAsync();
+        }
+        /// <summary>
         /// 登录Astost
         /// </summary>
         /// <param name="username">用户名</param>
         /// <param name="password">密码</param>
-        /// <param name="verifycode">验证码输入的方法</param>
+        /// <param name="verifycode">验证码（可以提前通过<see cref="GetVerifyCode"/>方法获得）</param>
         /// <returns></returns>
-        public async Task<LoginResult> Login(string username, string password, Func<System.IO.Stream, Task<string>> verifycode)
+        public async Task<LoginResult> Login(string username,string password, string verifycode)
         {
             if (await CheckLogin())
                 return LoginResult.Success;
-            int timestamp = (int)((DateTime.Now - new DateTime(1970, 1, 1).ToLocalTime()).TotalSeconds);
-            var imgrequest = new HttpRequestMessage(HttpMethod.Get, "https://www.astost.com/bbs/ck.php?nowtime=" + timestamp);
-            imgrequest.Headers.Accept.ParseAdd("image/webp,image/*,*/*;q=0.8");
-            var imgresponse = await _client.SendAsync(imgrequest);
-            var image = await imgresponse.Content.ReadAsStreamAsync();
-            var param = new Dictionary<string, string>{
-                ["jumpurl"] = "https://www.astost.com/bbs/index.php",
+            var param = new Dictionary<string, string>
+            {
+                ["jumpurl"] = Domain + "index.php",
                 ["step"] = "2",
                 ["cktime"] = "31536000",
                 ["lgt"] = "0",
                 ["pwuser"] = username,
                 ["pwpwd"] = password,
-                ["gdcode"] = await verifycode(image)
+                ["gdcode"] = verifycode
             };
-            var responese = await _client.PostAsync("https://www.astost.com/bbs/pw_ajax.php?action=login", new FormUrlEncodedContent(param));
+            var responese = await _Client.PostAsync(Domain + "pw_ajax.php?action=login", new FormUrlEncodedContent(param));
             string restext = await responese.Content.ReadAsStringAsync();
-            string rescontent = System.Text.RegularExpressions.Regex.Match(restext, @"!\[CDATA\[.*\]\]").Value;
+            string rescontent = System.Text.RegularExpressions.Regex.Match(restext, @"!\[CDATA\[[\s\S]*\]\]").Value;
+            var logoutlink = ExtensionMethods.LoadHtmlRootNode(rescontent).Descendants("a").Where((node) => node.InnerText == "退出")?.First();
+            if (logoutlink != null)
+                _logouturl = logoutlink.GetAttributeValue("href", "");
             if (rescontent.IndexOf("<div") < 0)
             {
                 _loggedin = false;
+                Log("Astost Crawler Login Failed");
                 if (rescontent.IndexOf("密码") >= 0)
                     return LoginResult.WrongPassword;
                 else if (rescontent.IndexOf("验证码") >= 0)
@@ -127,10 +150,30 @@ namespace JacobC.Music.Crawlers.Astost
             else
             {
                 _loggedin = true;
+                Log("Astost Crawler Login Succeed");
                 return LoginResult.Success;
             }
         }
-
+        /// <summary>
+        /// 登录Astost
+        /// </summary>
+        /// <param name="username">用户名</param>
+        /// <param name="password">密码</param>
+        /// <param name="verifycode">验证码输入的方法</param>
+        /// <returns></returns>
+        public async Task<LoginResult> Login(string username, string password, Func<Stream, Task<string>> verifycode) =>
+            await Login(username, password, await verifycode(await GetVerifyCode()));
+        public async void Logout()
+        {
+            if (await CheckLogin() && !string.IsNullOrEmpty(_logouturl))
+            {
+                var res = await _client.GetAsync(Domain + _logouturl);
+                res.EnsureSuccessStatusCode();
+                _loggedin = false;
+                Log("Astost Crawler Logged out");
+            }
+        }
+        #endregion
 
         public override async Task StartCrawling()
         {

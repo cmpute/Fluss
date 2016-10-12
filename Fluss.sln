@@ -9,6 +9,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JacobC.Music.Crawlers.Test"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JacobC.Music.Crawlers", "JacobC.Music.Crawlers\JacobC.Music.Crawlers.csproj", "{AF7E1DE2-9B5D-448E-9526-ECFBA7740A21}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{436140B4-38E3-431E-96BD-A5EBC109AA0E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestUI", "TestUI\TestUI.csproj", "{DC81675E-1B5E-41CD-AF31-0A773C41E015}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,8 +31,16 @@ Global
 		{AF7E1DE2-9B5D-448E-9526-ECFBA7740A21}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AF7E1DE2-9B5D-448E-9526-ECFBA7740A21}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AF7E1DE2-9B5D-448E-9526-ECFBA7740A21}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DC81675E-1B5E-41CD-AF31-0A773C41E015}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DC81675E-1B5E-41CD-AF31-0A773C41E015}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DC81675E-1B5E-41CD-AF31-0A773C41E015}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DC81675E-1B5E-41CD-AF31-0A773C41E015}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{80306FE2-A609-49DA-B06E-B503F25EF0D9} = {436140B4-38E3-431E-96BD-A5EBC109AA0E}
+		{DC81675E-1B5E-41CD-AF31-0A773C41E015} = {436140B4-38E3-431E-96BD-A5EBC109AA0E}
 	EndGlobalSection
 EndGlobal
