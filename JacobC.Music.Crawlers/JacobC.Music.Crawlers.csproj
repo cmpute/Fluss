@@ -54,6 +54,7 @@
     <Compile Include="Crawler.cs" />
     <Compile Include="ExtensionMethods.cs" />
     <Compile Include="ICrawlerWriter.cs" />
+    <Compile Include="LoginResult.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
