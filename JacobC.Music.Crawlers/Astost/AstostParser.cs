@@ -8,76 +8,51 @@ namespace JacobC.Music.Crawlers.Astost
 {
     public struct AstostAlbumInfo
     {
-        /// <summary>
-        /// 是否是自抓
-        /// </summary>
-        public bool IsSelfRIP;
-        /// <summary>
-        /// 是否为应求档
-        /// </summary>
-        public bool IsRequest;
-        /// <summary>
-        /// 专辑名
-        /// </summary>
-        public string Name;
-        /// <summary>
-        /// 专辑属性
-        /// </summary>
-        public string Attribute;
-        /// <summary>
-        /// 专辑艺术家
-        /// </summary>
-        public string[] Artist;
-        /// <summary>
-        /// 发售展会（同人专辑）
-        /// </summary>
-        public string Event;
-        /// <summary>
-        /// 发售日期 [YYMMDD]
-        /// </summary>
-        public string Date;
-        /// <summary>
-        /// 相关网站
-        /// </summary>
-        public Uri[] RelateWebsite;
+        ///// <summary>
+        ///// 是否为应求档
+        ///// </summary>
+        //public bool IsRequest;
+        ///// <summary>
+        ///// 专辑名
+        ///// </summary>
+        //public string Name;
+        ///// <summary>
+        ///// 专辑属性
+        ///// </summary>
+        //public string Attribute;
+        ///// <summary>
+        ///// 专辑艺术家
+        ///// </summary>
+        //public string[] Artist;
+        ///// <summary>
+        ///// 发售展会（同人专辑）
+        ///// </summary>
+        //public string Event;
+        ///// <summary>
+        ///// 发售日期 [YYMMDD]
+        ///// </summary>
+        //public string Date;
+        ///// <summary>
+        ///// 相关网站
+        ///// </summary>
+        //public Uri[] RelateWebsite;
         /// <summary>
         /// 文件格式
         /// </summary>
         public string[] FileFormats;
-        /// <summary>
-        /// 自抓者（如果是自抓资源）
-        /// </summary>
-        public string Ripper;
-        /// <summary>
-        /// 自抓工具列表
-        /// </summary>
-        public enum RipTool
-        {
-            /// <summary>
-            /// Exact Audio Copy
-            /// </summary>
-            EAC,
-            /// <summary>
-            /// X Lossless Decoder
-            /// </summary>
-            XLD,
-            /// <summary>
-            /// 其他
-            /// </summary>
-            Others
-        }
-        /// <summary>
-        /// 自抓工具
-        /// </summary>
-        public RipTool Tool;
+        ///// <summary>
+        ///// 自抓者（如果是自抓资源）
+        ///// </summary>
+        //public string Ripper;
+        
         /// <summary>
         /// 存储网盘
         /// </summary>
         public string Cloud;
-        /// <summary>
-        /// CD数
-        /// </summary>
-        public int CDNum;
+        ///// <summary>
+        ///// CD数
+        ///// </summary>
+        //public int CDNum;
     }
     /// <summary>
     /// 专辑属性列表

@@ -13,6 +13,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{436140B4
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestUI", "TestUI\TestUI.csproj", "{DC81675E-1B5E-41CD-AF31-0A773C41E015}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JacobC.Music", "JacobC.Music\JacobC.Music.csproj", "{28D83022-EB48-4D55-89A8-F02A4BCE91CE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,10 @@ Global
 		{DC81675E-1B5E-41CD-AF31-0A773C41E015}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DC81675E-1B5E-41CD-AF31-0A773C41E015}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DC81675E-1B5E-41CD-AF31-0A773C41E015}.Release|Any CPU.Build.0 = Release|Any CPU
+		{28D83022-EB48-4D55-89A8-F02A4BCE91CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{28D83022-EB48-4D55-89A8-F02A4BCE91CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{28D83022-EB48-4D55-89A8-F02A4BCE91CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{28D83022-EB48-4D55-89A8-F02A4BCE91CE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

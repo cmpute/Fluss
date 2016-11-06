@@ -4,11 +4,11 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{AF7E1DE2-9B5D-448E-9526-ECFBA7740A21}</ProjectGuid>
+    <ProjectGuid>{28D83022-EB48-4D55-89A8-F02A4BCE91CE}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>JacobC.Music.Crawlers</RootNamespace>
-    <AssemblyName>JacobC.Music.Crawlers</AssemblyName>
+    <RootNamespace>JacobC.Music</RootNamespace>
+    <AssemblyName>JacobC.Music</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -30,14 +30,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="HtmlAgilityPack, Version=1.4.9.5, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
-      <HintPath>..\packages\HtmlAgilityPack.1.4.9.5\lib\Net45\HtmlAgilityPack.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="HtmlAgilityPack.CssSelectors, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\HtmlAgilityPack.CssSelectors.1.0.2\lib\net45\HtmlAgilityPack.CssSelectors.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -48,24 +40,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Astost\AstostCrawler.cs" />
-    <Compile Include="Astost\AstostParser.cs" />
-    <Compile Include="Astost\AstostPostInfo.cs" />
-    <Compile Include="Crawler.cs" />
-    <Compile Include="ExtensionMethods.cs" />
-    <Compile Include="ICrawlerWriter.cs" />
-    <Compile Include="LoginResult.cs" />
+    <Compile Include="AlbumInfo.cs" />
+    <Compile Include="ArtistChara.cs" />
+    <Compile Include="ArtistInfo.cs" />
+    <Compile Include="InfoBase.cs" />
+    <Compile Include="OrganizationInfo.cs" />
+    <Compile Include="PerformerInfo.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\JacobC.Music\JacobC.Music.csproj">
-      <Project>{28d83022-eb48-4d55-89a8-f02a4bce91ce}</Project>
-      <Name>JacobC.Music</Name>
-    </ProjectReference>
+    <Compile Include="RipInfo.cs" />
+    <Compile Include="UnitInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
