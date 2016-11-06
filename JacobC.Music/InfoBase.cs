@@ -12,7 +12,7 @@ namespace JacobC.Music
     public class InfoBase
     {
         /// <summary>
-        /// 信息来源
+        /// 信息来源，包括文件地址
         /// string: RetrieveSource 信息获取的来源数据库/网站的标识符
         /// object: RetrieveParameter 从RetrieveSource获取信息的参数
         /// </summary>
@@ -23,5 +23,9 @@ namespace JacobC.Music
         /// ["Vgmdb"]={Type=Album, ID=XXXX}，是一个结构体
         /// </remarks>
         public Dictionary<string, object> InfoSource;
+
+        //RetrieveSource的标识符列表
+        public const string AstostId = "AstostPostID";
+        public const string LocalPath = "LocalPath";
     }
 }
