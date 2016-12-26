@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net;
 using System.Net.Http;
 using System.IO;
+using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 
 namespace JacobC.Music.Crawlers.Astost
@@ -12,16 +14,14 @@ namespace JacobC.Music.Crawlers.Astost
     /// <summary>
     /// Astost论坛爬虫
     /// </summary>
-    public class AstostCrawler : Crawler
+    public class AstostCrawler : Crawler<AstostArticleInfo>
     {
         #region .ctor And Fields
         const string Domain = "https://www.astost.com/bbs/";
+        const int PostPerPage = 18;
 
-        uint _startid;
-        bool _savecookie;
-        ICrawlerWriter<AstostPostInfo> _writer;
         HttpClient _client;
-        HttpClient _Client
+        HttpClient Client
         {
             get
             {
@@ -31,20 +31,18 @@ namespace JacobC.Music.Crawlers.Astost
             }
         }
 
-        public AstostCrawler(ICrawlerWriter<AstostPostInfo> writer, uint startId = 0, bool savecookie = false)
+        public AstostCrawler(ICrawlerWriter<AstostArticleInfo> writer)
+            : base(writer)
         {
-            _startid = startId;
-            _writer = writer;
-            _savecookie = savecookie;
         }
         ~AstostCrawler()
         {
-            if (!_savecookie)
+            if (!SaveCookie)
                 Logout();
         }
         #endregion
 
-        #region Properties
+        #region CrawlerSettings
         /// <summary>
         /// 抓取两个页面之间的间隔时间
         /// </summary>
@@ -54,12 +52,27 @@ namespace JacobC.Music.Crawlers.Astost
         /// 间隔时间是否随机化
         /// </summary>
         public bool GrabIntervalRandomize { get; set; } = true;
+
+        /// <summary>
+        /// 抓取的版块列表，传入其ID即可
+        /// </summary>
+        public IEnumerable<uint> GrabForumList { get; set; }
+
+        /// <summary>
+        /// 获取或设置开始抓取的帖子的ID，ID小于它的帖子将不会被抓取
+        /// </summary>
+        public uint StartPostID { get; set; } = 0;
+
+        /// <summary>
+        /// 获取或设置爬虫析构时是否保存Cookie
+        /// </summary>
+        public bool SaveCookie { get; set; } = false;
         #endregion
 
         #region Private Methods
         private void InitClient()
         {
-            if(_client==null)
+            if (_client == null)
             {
                 _client = new HttpClient(new HttpClientHandler() { AutomaticDecompression = DecompressionMethods.GZip });
                 _client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip");
@@ -68,18 +81,19 @@ namespace JacobC.Music.Crawlers.Astost
             }
         }
 
-        /// <summary>
-        /// 获取某一板块的指定页
-        /// </summary>
-        /// <param name="fid">板块编号</param>
-        /// <param name="page">页码</param>
-        /// <returns>页面的目录内容部分</returns>
-        private async Task<HtmlNode> FetchPageBody(int fid, int page)
+        Regex regtid = new Regex("(?<=tid=)[0-9]+",RegexOptions.Compiled);
+        private AstostArticleInfo ParseLine(HtmlNode tr)
         {
-            HtmlDocument doc = new HtmlDocument();
-            using (var response = await _Client.GetStreamAsync($"{Domain}/bbs/thread.php?fid={fid}&page={page}"))
-                doc.Load(response);
-            return doc.DocumentNode.QuerySelector("table #ajaxtable");
+            var result = new AstostArticleInfo();
+            var linknode = tr.SelectSingleNode("./td/h3/a");
+            result.Title = WebUtility.HtmlDecode(linknode.InnerText);
+            result.ThreadID = uint.Parse(regtid.Match(linknode.GetAttributeValue("href", "=0")).Value);
+            var user = tr.SelectSingleNode("./th/a[@class='bl']");
+            result.UserName = user.InnerText;
+            var linkaddr = user.GetAttributeValue("href", "=0");
+            result.UserID = uint.Parse(linkaddr.Substring(linkaddr.LastIndexOf('=') + 1));
+            result.PostDate = user.ParentNode.LastChild.InnerText;
+            return result;
         }
         #endregion
 
@@ -92,7 +106,7 @@ namespace JacobC.Music.Crawlers.Astost
         {
             if (!_loggedin.HasValue)
             {
-                var response = await _Client.GetStringAsync(Domain);
+                var response = await Client.GetStringAsync(Domain);
                 _loggedin = response.IndexOf("register.php") < 0;
             }
             return _loggedin.Value;
@@ -106,7 +120,7 @@ namespace JacobC.Music.Crawlers.Astost
             int timestamp = (int)((DateTime.Now - new DateTime(1970, 1, 1).ToLocalTime()).TotalSeconds);
             var imgrequest = new HttpRequestMessage(HttpMethod.Get, Domain + "ck.php?nowtime=" + timestamp);
             imgrequest.Headers.Accept.ParseAdd("image/webp,image/*,*/*;q=0.8");
-            var imgresponse = await _Client.SendAsync(imgrequest);
+            var imgresponse = await Client.SendAsync(imgrequest);
             return await imgresponse.Content.ReadAsStreamAsync();
         }
         /// <summary>
@@ -116,7 +130,7 @@ namespace JacobC.Music.Crawlers.Astost
         /// <param name="password">密码</param>
         /// <param name="verifycode">验证码（可以提前通过<see cref="GetVerifyCode"/>方法获得）</param>
         /// <returns></returns>
-        public async Task<LoginResult> Login(string username,string password, string verifycode)
+        public async Task<LoginResult> Login(string username, string password, string verifycode)
         {
             if (await CheckLogin())
                 return LoginResult.Success;
@@ -130,7 +144,7 @@ namespace JacobC.Music.Crawlers.Astost
                 ["pwpwd"] = password,
                 ["gdcode"] = verifycode
             };
-            var responese = await _Client.PostAsync(Domain + "pw_ajax.php?action=login", new FormUrlEncodedContent(param));
+            var responese = await Client.PostAsync(Domain + "pw_ajax.php?action=login", new FormUrlEncodedContent(param));
             string restext = await responese.Content.ReadAsStringAsync();
             string rescontent = System.Text.RegularExpressions.Regex.Match(restext, @"!\[CDATA\[[\s\S]*\]\]").Value;
             var logoutlink = ExtensionMethods.LoadHtmlRootNode(rescontent).Descendants("a").Where((node) => node.InnerText == "退出")?.First();
@@ -175,12 +189,88 @@ namespace JacobC.Music.Crawlers.Astost
         }
         #endregion
 
-        public override async Task StartCrawling()
+        /// <summary>
+        /// 抓取论坛的板块列表
+        /// </summary>
+        /// <returns>板块信息</returns>
+        public async Task<IEnumerable<AstostForumInfo>> FetchForumList()
         {
-            if (!await CheckLogin())
-                throw new InvalidOperationException("请登录后再启动爬虫");
-
+            var response = await Client.GetAsync(Domain);
+            var doc = new HtmlDocument();
+            doc.LoadHtml(await response.Content.ReadAsStringAsync());
+            return doc.DocumentNode.QuerySelectorAll("tr.tr3.f_one").Select((node) =>
+            {
+                var info = new AstostForumInfo();
+                var link = node.SelectSingleNode(".//h3/a");
+                info.Name = link.InnerText;
+                var linkaddr = link.GetAttributeValue("href", "thread.php?fid=1");
+                info.ID = uint.Parse(linkaddr.Substring(linkaddr.IndexOf('=') + 1));
+                var counts = node.SelectNodes(".//span[@class='f10']");
+                info.ArticleCount = int.Parse(counts[0].InnerText);
+                info.PostCount = int.Parse(counts[1].InnerText);
+                return info;
+            });
         }
 
+        public override async Task StartCrawling()
+        {
+            if (GrabForumList == null)
+                return;
+            if (!await CheckLogin())
+                throw new InvalidOperationException("请登录后再启动Astost爬虫");
+            int page = 2; //从2开始循环
+            HtmlDocument doc = new HtmlDocument();
+            bool pinflag = true, breakflag = false;
+            Random intvr = new Random();
+            foreach (int id in GrabForumList)
+            {
+                //处理第一页
+                doc.LoadHtml(await Client.GetStringAsync(Domain + $"thread.php?fid={id}"));
+                var table = doc.DocumentNode.QuerySelector("table#ajaxtable");
+                foreach (var row in table.SelectNodes("./tbody/tr").Skip(3))
+                {
+                    var cla = row.GetAttributeValue("class", string.Empty);
+                    if (string.IsNullOrEmpty(cla)) continue;
+                    if (cla == "tr2")
+                    {
+                        pinflag = false;
+                        continue;
+                    }
+                    var info = ParseLine(row);
+                    if (!pinflag && info.ThreadID < StartPostID)
+                    {
+                        breakflag = true;
+                        break;
+                    }
+                    if (breakflag) return;
+                    info.Pinned = pinflag;
+                    Writer.WriteData(info);
+                }
+                while (true)
+                {
+                    if (GrabIntervalRandomize)
+                        Thread.Sleep(intvr.Next(GrabInterval));
+                    else
+                        Thread.Sleep(GrabInterval);
+                    doc.LoadHtml(await Client.GetStringAsync(Domain + $"thread.php?fid={id}&page={page}"));
+                    table = doc.DocumentNode.QuerySelector("table#ajaxtable");
+                    var rows = table.SelectNodes("./tbody/tr[@align='center']");
+                    breakflag = false;
+                    foreach (var row in rows)
+                    {
+                        var info = ParseLine(row);
+                        if (info.ThreadID < StartPostID)
+                        {
+                            breakflag = true;
+                            break;
+                        }
+                        Writer.WriteData(info);
+                    }
+                    if (breakflag || rows.Count < PostPerPage) break;
+                    page++;
+                }
+                Thread.Sleep(1000);
+            }
+        }
     }
 }

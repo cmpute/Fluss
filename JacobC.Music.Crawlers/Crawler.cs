@@ -10,8 +10,17 @@ namespace JacobC.Music.Crawlers
     /// </summary>
     /// <param name="message"></param>
     public delegate void LogDelegate(string message);
-    public abstract class Crawler
+    public abstract class Crawler<TPost>
     {
+        /// <summary>
+        /// 获取或者设置爬虫爬取内容的存写器
+        /// </summary>
+        public ICrawlerWriter<TPost> Writer { get; set; }
+        public Crawler(ICrawlerWriter<TPost> writer)
+        {
+            Writer = writer;
+        }
+
         /// <summary>
         /// 爬虫日志的记录服务
         /// </summary>
@@ -20,6 +29,7 @@ namespace JacobC.Music.Crawlers
         {
             LogService?.Invoke(message);
         }
+
         /// <summary>
         /// 开始抓取
         /// </summary>

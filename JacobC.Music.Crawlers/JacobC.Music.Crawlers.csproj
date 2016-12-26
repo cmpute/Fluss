@@ -49,11 +49,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Astost\AstostCrawler.cs" />
+    <Compile Include="Astost\AstostForumInfo.cs" />
     <Compile Include="Astost\AstostParser.cs" />
-    <Compile Include="Astost\AstostPostInfo.cs" />
+    <Compile Include="Astost\AstostArticleInfo.cs" />
     <Compile Include="Crawler.cs" />
     <Compile Include="ExtensionMethods.cs" />
     <Compile Include="ICrawlerWriter.cs" />
+    <Compile Include="ListWriter.cs" />
     <Compile Include="Local\FileCrawler.cs" />
     <Compile Include="LoginResult.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
