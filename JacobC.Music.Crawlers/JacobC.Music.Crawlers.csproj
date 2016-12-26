@@ -49,11 +49,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Astost\AstostCrawler.cs" />
+    <Compile Include="Astost\AstostForumInfo.cs" />
     <Compile Include="Astost\AstostParser.cs" />
-    <Compile Include="Astost\AstostPostInfo.cs" />
+    <Compile Include="Astost\AstostArticleInfo.cs" />
     <Compile Include="Crawler.cs" />
     <Compile Include="ExtensionMethods.cs" />
     <Compile Include="ICrawlerWriter.cs" />
+    <Compile Include="ListWriter.cs" />
+    <Compile Include="Local\FileCrawler.cs" />
     <Compile Include="LoginResult.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -67,6 +70,7 @@
       <Name>JacobC.Music</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

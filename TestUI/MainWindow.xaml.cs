@@ -13,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using JacobC.Music.Crawlers.Astost;
+using JacobC.Music.Crawlers;
 
 namespace TestUI
 {
@@ -24,9 +25,11 @@ namespace TestUI
         public MainWindow()
         {
             InitializeComponent();
+            ac = new AstostCrawler(lr);
         }
 
-        AstostCrawler ac = new AstostCrawler(null);
+        ListWriter<AstostArticleInfo> lr = new ListWriter<AstostArticleInfo>();
+        AstostCrawler ac;
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
@@ -44,6 +47,20 @@ namespace TestUI
         {
             Status.Text = "Logging out";
             ac.Logout();
+        }
+
+        private async void Button_Click_2(object sender, RoutedEventArgs e)
+        {
+            ac.StartPostID = 11007500;
+            ac.GrabForumList = new uint[] { 42 };
+            await ac.StartCrawling();
+            var list = lr.Result;
+            System.Diagnostics.Debugger.Break();
+        }
+
+        private async void VerifyImage_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            VerifyImage.Source = BitmapFrame.Create(await ac.GetVerifyCode());
         }
     }
 }

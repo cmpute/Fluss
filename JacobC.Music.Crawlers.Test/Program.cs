@@ -20,9 +20,7 @@ namespace JacobC.Music.Crawlers.Test
 
         static async Task CrawlerTest()
         {
-            AstostCrawler c = new AstostCrawler(null);
-            var t = await c.CheckLogin();
-            Debugger.Break();
+            //Debugger.Break();
         }
 
         static async Task FetchTest()

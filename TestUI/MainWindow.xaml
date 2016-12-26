@@ -9,13 +9,14 @@
         Loaded="Window_Loaded">
     <Grid>
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="200">
-            <Image x:Name="VerifyImage"/>
+            <Image x:Name="VerifyImage" MouseDown="VerifyImage_MouseDown"/>
             <TextBox x:Name="Username" Text="用户名"/>
             <PasswordBox x:Name="Password"  InputScope="Password"/>
             <TextBox x:Name="Code" Text="验证码"/>
             <StackPanel Orientation="Horizontal">
                 <Button Content="登录" Click="Button_Click"/>
                 <Button Content="退出" Click="Button_Click_1"/>
+                <Button Content="抓取同人版" Click="Button_Click_2"/>
             </StackPanel>
             <TextBlock x:Name="Status"/>
         </StackPanel>

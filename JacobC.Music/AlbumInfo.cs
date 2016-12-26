@@ -10,10 +10,13 @@ namespace JacobC.Music
 {
     public class AlbumInfo : InfoBase
     {
+        /// <summary>
+        /// 专辑名称
+        /// </summary>
         public string Name;
 
         /// <summary>
-        /// 专辑属性
+        /// 专辑属性 TODO:完善专辑属性的分类
         /// </summary>
         public string Attribute;
 
@@ -29,10 +32,13 @@ namespace JacobC.Music
         public RipInfo Rip;
 
         /// <summary>
-        /// 专辑艺术家
+        /// 专辑表演者（主要指歌手或组合）
         /// </summary>
         public PerformerInfo Performer;
 
+        /// <summary>
+        /// 专辑其他艺术家
+        /// </summary>
         public IEnumerable<TrackArtist> Artists;
 
         /// <summary>
@@ -51,21 +57,37 @@ namespace JacobC.Music
         public string Date;
 
         /// <summary>
-        /// 相关网站
-        /// </summary>
-        public IEnumerable<Uri> RelateWebsite;
-
-        /// <summary>
         /// 专辑编号/番号
         /// </summary>
         public string Catalog;
 
-        public IList<DiskInfo> Disks;
+        /// <summary>
+        /// 专辑所含的Disc列表
+        /// </summary>
+        public IList<DiscInfo> Discs;
+
+        /// <summary>
+        /// 专辑附件，包括DVD、BK、特典等等
+        /// </summary>
+        public IEnumerable<InfoBase> Attachments;
     }
 
-    public struct DiskInfo
+    public struct DiscInfo
     {
-        public uint DiskNumber;
+        /// <summary>
+        /// 部分专辑每一张碟子都是有标题的
+        /// </summary>
+        public string DiscName;
+        /// <summary>
+        /// 碟片编号
+        /// </summary>
+        /// <remarks>
+        /// DiscNumber=0代表该Disc是专辑唯一的碟片
+        /// </remarks>
+        public uint DiscNumber;
+        /// <summary>
+        /// 碟片所含音轨列表
+        /// </summary>
         public IList<TrackInfo> TrackList;
     }
 
