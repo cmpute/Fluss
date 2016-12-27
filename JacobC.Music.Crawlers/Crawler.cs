@@ -8,7 +8,7 @@ namespace JacobC.Music.Crawlers
     /// <summary>
     /// 用来记录日志的代理方法
     /// </summary>
-    /// <param name="message"></param>
+    /// <param name="message">日志消息，不含换行符</param>
     public delegate void LogDelegate(string message);
     public abstract class Crawler<TPost>
     {
@@ -25,9 +25,11 @@ namespace JacobC.Music.Crawlers
         /// 爬虫日志的记录服务
         /// </summary>
         public event LogDelegate LogService;
-        protected virtual void Log(string message)
+        protected virtual void Log(string message, string caller)
         {
-            LogService?.Invoke(message);
+#if DEBUG
+            LogService?.Invoke($"[{caller}]{message}");
+#endif
         }
 
         /// <summary>

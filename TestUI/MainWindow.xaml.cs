@@ -25,7 +25,14 @@ namespace TestUI
         public MainWindow()
         {
             InitializeComponent();
-            ac = new AstostCrawler(cw);
+            ac = new AstostCrawler(cw) { SaveCookie = true };
+            ac.LogService += (message) => System.Diagnostics.Debug.WriteLine(message);
+            AdditionTask();
+        }
+
+        async void AdditionTask()
+        {
+            Status.Text = (await ac.CheckLogin()) ? "Already Logged in" : "Not Logged in";
         }
 
         CsvWriter<AstostArticleInfo> cw = new CsvWriter<AstostArticleInfo>(@"C:\Users\cmpute\Desktop\test.csv");
@@ -33,7 +40,6 @@ namespace TestUI
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            ac.LogService += (message) => System.Diagnostics.Debug.WriteLine(message);
             VerifyImage.Source = BitmapFrame.Create(await ac.GetVerifyCode());
         }
 

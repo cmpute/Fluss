@@ -20,6 +20,8 @@ namespace JacobC.Music.Crawlers.Astost
         const string Domain = "https://www.astost.com/bbs/";
         const int PostPerPage = 18;
 
+        string cookiepath = "cookie.dat";
+        CookieContainer _cookiecontainer;
         HttpClient _client;
         HttpClient Client
         {
@@ -39,6 +41,8 @@ namespace JacobC.Music.Crawlers.Astost
         {
             if (!SaveCookie)
                 Logout();
+            else
+                SaveCookies();
         }
         #endregion
 
@@ -64,21 +68,55 @@ namespace JacobC.Music.Crawlers.Astost
         public uint StartPostID { get; set; } = 0;
 
         /// <summary>
-        /// 获取或设置爬虫析构时是否保存Cookie
+        /// 获取或设置爬虫创建时是否从文件目录读取cookie，以及析构时是否保存Cookie
         /// </summary>
         public bool SaveCookie { get; set; } = false;
+
+        /// <summary>
+        /// 获取或设置爬虫的cookie存储的位置
+        /// </summary>
+        public string LocalCookiePath
+        {
+            get { return cookiepath; }
+            set { cookiepath = value; }
+        }
         #endregion
 
         #region Private Methods
+        private void Log(string message) => Log(message, nameof(AstostCrawler));
+
         private void InitClient()
         {
             if (_client == null)
             {
-                _client = new HttpClient(new HttpClientHandler() { AutomaticDecompression = DecompressionMethods.GZip });
+                _cookiecontainer = new CookieContainer();
+                if (SaveCookie) LoadCookies();
+                _client = new HttpClient(new HttpClientHandler() { AutomaticDecompression = DecompressionMethods.GZip, CookieContainer = _cookiecontainer });
                 _client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip");
                 _client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("zh-Hans-CN,zh-Hans;q=0.9,ja;q=0.7,de-DE;q=0.6,de;q=0.4,en-US;q=0.3,en;q=0.1");
                 _client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36");
             }
+        }
+
+        private void LoadCookies()
+        {
+            Log("Loading cookies from " + cookiepath);
+
+            if (File.Exists(cookiepath))
+                using (Stream s = File.OpenRead(cookiepath))
+                    _cookiecontainer.Add(ExtensionMethods.Deserialize<CookieCollection>(s));
+
+            Log("Cookies loaded!");
+        }
+
+        private void SaveCookies()
+        {
+            Log("Saving cookies to " + cookiepath);
+
+            using (Stream s = File.Create(cookiepath))
+                _cookiecontainer.GetCookies(new Uri("https://www.astost.com")).Serialize(s);
+
+            Log("Cookies Saved!");
         }
 
         Regex regtid = new Regex("(?<=tid=)[0-9]+",RegexOptions.Compiled);
@@ -117,6 +155,8 @@ namespace JacobC.Music.Crawlers.Astost
         /// </summary>
         public async Task<Stream> GetVerifyCode()
         {
+            Log("Fetching verify code Image");
+
             int timestamp = (int)((DateTime.Now - new DateTime(1970, 1, 1).ToLocalTime()).TotalSeconds);
             var imgrequest = new HttpRequestMessage(HttpMethod.Get, Domain + "ck.php?nowtime=" + timestamp);
             imgrequest.Headers.Accept.ParseAdd("image/webp,image/*,*/*;q=0.8");
@@ -144,6 +184,8 @@ namespace JacobC.Music.Crawlers.Astost
                 ["pwpwd"] = password,
                 ["gdcode"] = verifycode
             };
+            Log("Attempt to log in...");
+
             var responese = await Client.PostAsync(Domain + "pw_ajax.php?action=login", new FormUrlEncodedContent(param));
             string restext = await responese.Content.ReadAsStringAsync();
             string rescontent = System.Text.RegularExpressions.Regex.Match(restext, @"!\[CDATA\[[\s\S]*\]\]").Value;
@@ -164,7 +206,7 @@ namespace JacobC.Music.Crawlers.Astost
             else
             {
                 _loggedin = true;
-                Log("Astost Crawler Login Succeed");
+                Log("Astost crawler login succeed!");
                 return LoginResult.Success;
             }
         }
