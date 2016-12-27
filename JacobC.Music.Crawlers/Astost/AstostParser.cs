@@ -61,10 +61,6 @@ namespace JacobC.Music.Crawlers.Astost
     public enum AstostAlbumAttribute
     {
         /// <summary>
-        /// 同人专辑
-        /// </summary>
-        Doujin = 0,
-        /// <summary>
         /// 高音质专辑
         /// </summary>
         Hires = 1,
@@ -83,7 +79,7 @@ namespace JacobC.Music.Crawlers.Astost
         /// <summary>
         /// 非实体专辑
         /// </summary>
-        OnlineBought = 16
+        Digital = 16
     }
     public static class AstostTextParser
     {

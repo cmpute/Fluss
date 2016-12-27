@@ -25,10 +25,10 @@ namespace TestUI
         public MainWindow()
         {
             InitializeComponent();
-            ac = new AstostCrawler(lr);
+            ac = new AstostCrawler(cw);
         }
 
-        ListWriter<AstostArticleInfo> lr = new ListWriter<AstostArticleInfo>();
+        CsvWriter<AstostArticleInfo> cw = new CsvWriter<AstostArticleInfo>(@"C:\Users\cmpute\Desktop\test.csv");
         AstostCrawler ac;
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -54,8 +54,7 @@ namespace TestUI
             ac.StartPostID = 11007500;
             ac.GrabForumList = new uint[] { 42 };
             await ac.StartCrawling();
-            var list = lr.Result;
-            System.Diagnostics.Debugger.Break();
+            MessageBox.Show("爬虫完成");
         }
 
         private async void VerifyImage_MouseDown(object sender, MouseButtonEventArgs e)

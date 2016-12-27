@@ -37,10 +37,12 @@ namespace JacobC.Music.Crawlers.Astost
         /// <summary>
         /// 文章最后被更新的日期
         /// </summary>
+        [CsvIgnore]
         public string LastUpdateDate { get { throw new NotImplementedException(); } }
         /// <summary>
         /// 文章分类
         /// </summary>
+        [CsvIgnore]
         public string Category { get { throw new NotImplementedException(); } }
 
         public override string ToString()

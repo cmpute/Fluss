@@ -53,6 +53,8 @@
     <Compile Include="Astost\AstostParser.cs" />
     <Compile Include="Astost\AstostArticleInfo.cs" />
     <Compile Include="Crawler.cs" />
+    <Compile Include="CsvSerializer.cs" />
+    <Compile Include="CsvWriter.cs" />
     <Compile Include="ExtensionMethods.cs" />
     <Compile Include="ICrawlerWriter.cs" />
     <Compile Include="ListWriter.cs" />
