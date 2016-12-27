@@ -16,5 +16,9 @@ namespace JacobC.Music.Crawlers
         /// </summary>
         /// <param name="data">数据内容</param>
         void WriteData(TData data);
+        /// <summary>
+        /// 记录多条爬下来的数据
+        /// </summary>
+        void WriteData(IEnumerable<TData> data);
     }
 }

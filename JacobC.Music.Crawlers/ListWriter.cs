@@ -13,6 +13,11 @@ namespace JacobC.Music.Crawlers
     public class ListWriter<T> : ICrawlerWriter<T>
     {
         public List<T> Result { get; protected set; } = new List<T>();
+
+        /// <inheritdoc/>
+        public void WriteData(IEnumerable<T> data) => Result.AddRange(data);
+
+        /// <inheritdoc/>
         public void WriteData(T data) => Result.Add(data);
     }
 }
