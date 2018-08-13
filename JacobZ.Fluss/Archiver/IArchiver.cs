@@ -20,6 +20,14 @@ namespace JacobZ.Fluss.Archiver
         void Decompress(string archivePath, string outputPath);
 
         /// <summary>
+        /// 解压压缩包中的部分文件
+        /// </summary>
+        /// <param name="archivePath">压缩文件目录</param>
+        /// <param name="outputPath">输出位置</param>
+        /// <param name="files">所解压文件在压缩包中的路径</param>
+        void Decompress(string archivePath, string outputPath, params string[] files);
+
+        /// <summary>
         /// 建立压缩文件
         /// </summary>
         /// <param name="archivePath">压缩文件目录</param>

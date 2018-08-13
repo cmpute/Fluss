@@ -93,8 +93,19 @@ namespace JacobZ.Music
 
     public class TrackInfo
     {
+        /// <summary>
+        /// 音轨列表
+        /// </summary>
         public uint TrackNumber;
+
+        /// <summary>
+        /// 音轨名
+        /// </summary>
         public string Name;
+
+        /// <summary>
+        /// 音轨艺术家
+        /// </summary>
         public IEnumerable<TrackArtist> Artists;
     }
 }
