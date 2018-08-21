@@ -5,8 +5,53 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:JacobZ.Fluss.Win"
         mc:Ignorable="d"
-        Title="MainWindow" Height="350" Width="525">
+        Title="Fluss" Height="350" Width="525">
     <Grid>
+        <Grid.Resources>
+            <Style x:Key="MenuButton" TargetType="ListBoxItem">
+                <Setter Property="FontSize" Value="24"/>
+                <Setter Property="Margin" Value="8"/>
+            </Style>
+            <Style x:Key="HeaderText" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Margin" Value="4"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+        </Grid.Resources>
         
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+
+        <ListBox Grid.Row="1" BorderThickness="0">
+            <ListBoxItem Style="{StaticResource MenuButton}">文件转换</ListBoxItem>
+            <ListBoxItem Style="{StaticResource MenuButton}">信息编辑</ListBoxItem>
+        </ListBox>
+
+        <StackPanel Grid.ColumnSpan="2" Background="DarkSlateGray">
+            <Grid Margin="4, 0" Height="32">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource HeaderText}">文件(夹)路径</TextBlock>
+                <TextBox Margin="4" Grid.Column="1" VerticalContentAlignment="Center"/>
+            </Grid>
+            <Grid Margin="4, 0" Height="32">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource HeaderText}">输出路径</TextBlock>
+                <TextBox Margin="4" Grid.Column="1" VerticalContentAlignment="Center"/>
+                <Button Margin="4" Grid.Column="2" Width="40" Content="生成"/>
+            </Grid>
+        </StackPanel>
     </Grid>
 </Window>

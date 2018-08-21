@@ -6,12 +6,15 @@ namespace JacobZ.Fluss.Archiver
 {
     using JacobZ.Fluss.Utils;
 
+    /// <summary>
+    /// 利用外部Rar.exe的压缩对象
+    /// </summary>
     public class ExternRarProvider : IArchiver
     {
         private string _rar;
 
         /// <summary>
-        /// 新建RAR压缩提供对象
+        /// 新建RAR压缩对象
         /// </summary>
         /// <param name="rarPath">WinRAR安装目录</param>
         public ExternRarProvider(string rarPath)
@@ -35,12 +38,12 @@ namespace JacobZ.Fluss.Archiver
 
         public void Compress(string archivePath, CompressSettings settings)
         {
-            throw new NotImplementedException();
+            throw new NotImplementedException(); // TODO: Implement
         }
 
         public void Decompress(string archivePath, string outputPath)
         {
-            Process exec = ProcessHelper.Generate(_rar);
+            Process exec = ProcessHelper.Generate(_rar, "x", archivePath, outputPath);
             exec.StartInfo.Arguments = "x " + archivePath + " " + outputPath;
             exec.Start();
             exec.EnsureExit();
@@ -48,8 +51,7 @@ namespace JacobZ.Fluss.Archiver
 
         public void Decompress(string archivePath, string outputPath, params string[] files)
         {
-            Process exec = ProcessHelper.Generate(_rar);
-            exec.StartInfo.Arguments = "x " + archivePath + " " + string.Join(" ", files) + " " + outputPath;
+            Process exec = ProcessHelper.Generate(_rar, "x", archivePath, string.Join(" ", files), outputPath);
             exec.Start();
             exec.EnsureExit();
         }

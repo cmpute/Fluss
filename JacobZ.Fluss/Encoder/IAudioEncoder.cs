@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.IO;
 
 namespace JacobZ.Fluss.Encoder
 {
@@ -9,17 +7,15 @@ namespace JacobZ.Fluss.Encoder
         /// <summary>
         /// 编码音频文件
         /// </summary>
-        /// <param name="wavPath">WAV文件位置</param>
-        void Encode(string wavPath);
+        void Encode(Stream input, string outputFile);
 
         /// <summary>
         /// 解码音频文件
         /// </summary>
-        /// <param name="audioPath">音频文件位置</param>
-        void Decode(string audioPath);
+        void Decode(Stream output, string inputFile);
 
-        void ReadTags(string audioPath);
+        void ReadTags(string input);
 
-        void WriteTags(string audioPath);
+        void WriteTags(string output);
     }
 }
