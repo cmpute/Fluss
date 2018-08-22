@@ -9,7 +9,7 @@ namespace JacobZ.Fluss.Archiver
     /// <summary>
     /// 利用外部Rar.exe的压缩对象
     /// </summary>
-    public class ExternRarProvider : IArchiver
+    public class RAR : IArchiver
     {
         private string _rar;
 
@@ -17,7 +17,7 @@ namespace JacobZ.Fluss.Archiver
         /// 新建RAR压缩对象
         /// </summary>
         /// <param name="rarPath">WinRAR安装目录</param>
-        public ExternRarProvider(string rarPath)
+        public RAR(string rarPath)
         {
             _rar = rarPath;
             VersionCheck();

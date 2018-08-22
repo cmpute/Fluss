@@ -23,6 +23,23 @@ namespace JacobZ.Fluss.Win
         public MainWindow()
         {
             InitializeComponent();
+
+            new Views.FileConversion();
+            new Views.MetaInfo();
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            this.MainFrame.Navigate(Views.FileConversion.Instance);
+        }
+
+        private void ListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var selected = e.AddedItems[0];
+            if (selected == (sender as ListBox).Items[0])
+                MainFrame.Navigate(Views.FileConversion.Instance);
+            else if (selected == (sender as ListBox).Items[1])
+                MainFrame.Navigate(Views.MetaInfo.Instance);
         }
     }
 }

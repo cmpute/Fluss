@@ -1,8 +1,8 @@
 ﻿using System.IO;
 
-namespace JacobZ.Fluss.Encoder
+namespace JacobZ.Fluss.AudioCodec
 {
-    public interface IAudioEncoder
+    public interface IAudioCodec
     {
         /// <summary>
         /// 编码音频文件

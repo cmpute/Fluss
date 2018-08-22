@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace JacobZ.Fluss.Encoder
+namespace JacobZ.Fluss.AudioCodec
 {
     class EncodeSettings
     {
