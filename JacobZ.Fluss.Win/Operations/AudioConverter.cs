@@ -5,9 +5,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using JacobZ.Fluss.AudioCodec;
 
-namespace JacobZ.Fluss.Win.Operation
+namespace JacobZ.Fluss.Win.Operations
 {
-    class AudioConverter : ISourceConverter
+    class AudioConverter : ISourceOperation
     {
         private const string EXT_Wave = ".wav";
         private const string EXT_FreeLossless = ".flac";
@@ -18,11 +18,24 @@ namespace JacobZ.Fluss.Win.Operation
 
         string _tformat;
 
+        public AudioConverter() { }
+
         public AudioConverter(string targetFormat)
         {
             if (!SupportedFormats.Contains(targetFormat))
                 throw new NotSupportedException();
             _tformat = targetFormat;
+        }
+
+        public string TargetFormat
+        {
+            get => _tformat;
+            set
+            {
+                if (!SupportedFormats.Contains(value))
+                    throw new NotSupportedException();
+                _tformat = value;
+            }
         }
 
         public IAudioCodec GetCodecFromExt(string extension)
@@ -46,14 +59,17 @@ namespace JacobZ.Fluss.Win.Operation
             {
                 MemoryStream ms = new System.IO.MemoryStream();
                 decoder.Decode(ms, targetFile);
-                ms.Seek(0, System.IO.SeekOrigin.Begin);
+                ms.Seek(0, SeekOrigin.Begin);
                 encoder.Encode(ms, outputfile);
             });
         }
 
+        public string Name => "音频文件重新编码";
+
         public bool CheckUsable(string targetFile)
         {
-            return SupportedFormats.Contains(targetFile);
+            string ext = Path.GetExtension(targetFile);
+            return SupportedFormats.Contains(ext) && ext != _tformat;
         }
 
         public string[] GetExpectedOutputs(string targetFile)

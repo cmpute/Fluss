@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.IO;
 using System.Threading.Tasks;
 using JacobZ.Fluss.Archiver;
 using JacobZ.Fluss.AudioCodec;
+using Microsoft.Win32;
 
 namespace JacobZ.Fluss.Win.Utils
 {
@@ -58,7 +59,28 @@ namespace JacobZ.Fluss.Win.Utils
 
         private static string Frar()
         {
-            throw new NotImplementedException();
+            // search for registry
+            string key = @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\WinRAR.exe";
+            RegistryKey registryKey = Registry.LocalMachine.OpenSubKey(key);
+            if (registryKey != null)
+            {
+                string path = registryKey.GetValue("Path").ToString();
+                registryKey.Close();
+                return Path.Combine(path, "rar.exe");
+            }
+
+            // search for PATH
+            foreach (var path in Environment.GetEnvironmentVariable("PATH").Split(';'))
+                foreach(var file in Directory.GetFiles(path))
+                    if(Path.GetFileName(file).ToLower() == "rar.exe")
+                        return file;
+
+            // search for current dir
+            foreach (var file in Directory.GetFiles(Environment.CurrentDirectory))
+                if (Path.GetFileName(file).ToLower() == "rar.exe")
+                    return file;
+
+            return null;
         }
     }
 }

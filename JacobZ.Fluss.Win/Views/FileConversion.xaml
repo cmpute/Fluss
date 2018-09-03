@@ -4,6 +4,8 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
       xmlns:local="clr-namespace:JacobZ.Fluss.Win.Views"
+      xmlns:model="clr-namespace:JacobZ.Fluss.Win.Models"
+      xmlns:op="clr-namespace:JacobZ.Fluss.Win.Operations"
       mc:Ignorable="d" 
       d:DesignHeight="450" d:DesignWidth="800"
       Title="FileConversion">
@@ -16,8 +18,24 @@
             <ColumnDefinition/>
             <ColumnDefinition/>
         </Grid.ColumnDefinitions>
-        <ListView x:Name="OriginFileView" Margin="4,8,0,8"></ListView>
-        <ListView x:Name="ConvertFileView" Margin="0,8,4,8" Grid.Column="1"></ListView>
+        <ListView x:Name="OriginFileView" Margin="4,8"
+                  ItemsSource="{Binding SourceList}" DisplayMemberPath="FilePath"
+                  SelectionChanged="OriginFileView_SelectionChanged">
+            <!--<ListView.View>
+                <GridView>
+                    <GridViewColumn Width="200" Header="File Name"
+                                    DisplayMemberBinding="{Binding FilePath}"/>
+                </GridView>
+            </ListView.View>-->
+            <!--<ListView.ItemTemplate>
+                <DataTemplate DataType="{x:Type model:SourceItem}">
+                    <Grid>
+                        <TextBlock Text="{Binding FileName}"/>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>-->
+        </ListView>
+        <ListView x:Name="ConvertFileView" Margin="4,8" Grid.Column="1"></ListView>
         <Grid Grid.Row="1" Grid.ColumnSpan="2">
             <Grid.RowDefinitions>
                 <RowDefinition/>
@@ -30,12 +48,18 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock VerticalAlignment="Center">执行操作：</TextBlock>
-                <ComboBox Grid.Column="1"></ComboBox>
+                <ComboBox Grid.Column="1" x:Name="PossibleOps">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Name}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <Button Grid.Column="2" Width="40" Height="28" Margin="4,0">选项</Button>
             </Grid>
             <StackPanel Grid.Row="1" Height="32" Orientation="Horizontal" Margin="8">
                 <TextBlock VerticalAlignment="Center">输出分类：</TextBlock>
-                <ComboBox Width="320"/>
+                <ComboBox Width="240"/>
                 <Button Margin="8,0,4,0" Width="64">添加处理</Button>
                 <Button Margin="4,0" Width="64">删除处理</Button>
             </StackPanel>

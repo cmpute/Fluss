@@ -2,7 +2,7 @@
 using System.Linq;
 using System.IO;
 
-namespace JacobZ.Fluss.Win.Operation
+namespace JacobZ.Fluss.Win.Operations
 {
     static class TargetClassifier
     {

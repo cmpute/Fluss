@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:JacobZ.Fluss.Win"
         mc:Ignorable="d" Loaded="Window_Loaded"
-        Title="Fluss" Height="350" Width="525">
+        Title="Fluss" Height="350" Width="600">
     <Grid>
         <Grid.Resources>
             <Style x:Key="MenuButton" TargetType="ListBoxItem">
@@ -38,9 +38,16 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Style="{StaticResource HeaderText}">文件(夹)路径</TextBlock>
-                <TextBox Margin="4" Grid.Column="1" VerticalContentAlignment="Center"/>
+                <TextBox Margin="4" Grid.Column="1" VerticalContentAlignment="Center"
+                         x:Name="RootPath" IsReadOnly="True" TextChanged="RootPath_TextChanged"/>
+                <Button Margin="4" Grid.Column="2" Width="40" Content="选文件夹"
+                        x:Name="BrowseFileButton" Click="BrowseFileButton_Click"/>
+                <Button Margin="4" Grid.Column="3" Width="56" Content="选文件夹"
+                        x:Name="BrowseDirectoryButton" Click="BrowseDirectoryButton_Click"/>
             </Grid>
             <Grid Margin="4, 0" Height="32">
                 <Grid.ColumnDefinitions>

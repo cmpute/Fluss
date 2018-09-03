@@ -44,7 +44,6 @@ namespace JacobZ.Fluss.Archiver
         public void Decompress(string archivePath, string outputPath)
         {
             Process exec = ProcessHelper.Generate(_rar, "x", archivePath, outputPath);
-            exec.StartInfo.Arguments = "x " + archivePath + " " + outputPath;
             exec.Start();
             exec.EnsureExit();
         }
@@ -58,9 +57,9 @@ namespace JacobZ.Fluss.Archiver
 
         public IEnumerable<string> GetContentList(string archivePath)
         {
-            Process exec = ProcessHelper.Generate(_rar);
-            exec.StartInfo.Arguments = "lb " + archivePath;
+            Process exec = ProcessHelper.Generate(_rar, "lb", archivePath);
             exec.Start();
+            // exec.StandardInput.Close();
             exec.EnsureExit();
 
             var output = exec.StandardOutput;

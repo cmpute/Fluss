@@ -9,6 +9,7 @@ namespace JacobZ.Fluss.Utils
         {
             Process exec = new Process();
             exec.StartInfo.UseShellExecute = false;
+            exec.StartInfo.CreateNoWindow = true;
             exec.StartInfo.RedirectStandardInput = true;
             exec.StartInfo.RedirectStandardOutput = true;
             exec.StartInfo.RedirectStandardError = true;
@@ -20,13 +21,19 @@ namespace JacobZ.Fluss.Utils
         public static Process Generate(string executable, params string[] arguments)
         {
             Process exec = Generate(executable);
+
+            // escape blanks
+            for (int i = 0; i < arguments.Length; i++)
+                if (arguments[i].Contains(" "))
+                    arguments[i] = "\"" + arguments[i] + "\"";
             exec.StartInfo.Arguments = string.Join(" ", arguments);
+
             return exec;
         }
 
         public static void EnsureExit(this Process process)
         {
-            while (!process.HasExited) ;
+            process.WaitForExit();
             if (process.ExitCode != 0)
                 throw new ExecutionException(process.StandardError.ReadToEnd())
                 { Output = process.StandardOutput.ReadToEnd() };
