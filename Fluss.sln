@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27428.2015
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JacobZ.Fluss.Win", "JacobZ.Fluss.Win\JacobZ.Fluss.Win.csproj", "{198D3BB9-8742-43E4-82BA-B4B61C3C2CC2}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{436140B4-38E3-431E-96BD-A5EBC109AA0E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JacobZ.Fluss.Win", "JacobZ.Fluss.Win\JacobZ.Fluss.Win.csproj", "{198D3BB9-8742-43E4-82BA-B4B61C3C2CC2}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JacobZ.Fluss", "JacobZ.Fluss\JacobZ.Fluss.csproj", "{EADC38E4-9891-4D9A-8519-F522A27AA6EF}"
 EndProject
