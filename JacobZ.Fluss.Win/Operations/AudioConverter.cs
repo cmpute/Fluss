@@ -38,7 +38,7 @@ namespace JacobZ.Fluss.Win.Operations
             }
         }
 
-        public IAudioCodec GetCodecFromExt(string extension)
+        public IPcmCodec GetCodecFromExt(string extension)
         {
             switch (extension)
             {

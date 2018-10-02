@@ -21,7 +21,7 @@ namespace JacobZ.Fluss.Win.Utils
         }
 
         public static string FindAudioEncoder<Codec>()
-            where Codec : IAudioCodec
+            where Codec : IPcmCodec
         {
             var codec = typeof(Codec);
             if (codec == typeof(TTA))
@@ -32,7 +32,7 @@ namespace JacobZ.Fluss.Win.Utils
         }
 
         public static string FindAudioDecoder<Codec>()
-            where Codec : IAudioCodec
+            where Codec : IPcmCodec
         {
             var codec = typeof(Codec);
             if (codec == typeof(TTA))

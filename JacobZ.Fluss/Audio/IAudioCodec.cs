@@ -1,8 +1,8 @@
 ﻿using System.IO;
 
-namespace JacobZ.Fluss.AudioCodec
+namespace JacobZ.Fluss.Audio
 {
-    public interface IAudioCodec
+    public interface IPcmCodec
     {
         /// <summary>
         /// 编码音频文件

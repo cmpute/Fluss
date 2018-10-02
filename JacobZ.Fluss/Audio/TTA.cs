@@ -2,29 +2,19 @@
 using System.Diagnostics;
 using System.IO;
 
-namespace JacobZ.Fluss.AudioCodec
+namespace JacobZ.Fluss.Audio
 {
     using JacobZ.Fluss.Utils;
 
-    public class WavPack : IAudioCodec
+    public class TTA : IPcmCodec
     {
-        string _wvpack, _wvunpack;
+        string _tta;
 
-        public WavPack(string wavpackPath, string wvunpackPath)
-        {
-            _wvpack = wavpackPath;
-            _wvunpack = wvunpackPath;
-        }
-
-        public WavPack(string wavpackPath)
-        {
-            _wvpack = wavpackPath;
-            _wvunpack = Path.Combine(Path.GetDirectoryName(wavpackPath), "wvunpack" + Path.GetExtension(wavpackPath));
-        }
+        public TTA(string ttaPath) { _tta = ttaPath; }
 
         public void Decode(Stream output, string inputFile)
         {
-            Process exec = ProcessHelper.Generate(_wvunpack, inputFile, "-");
+            Process exec = ProcessHelper.Generate(_tta, "-d", inputFile, "-");
             exec.Start();
             exec.StandardOutput.BaseStream.CopyTo(output);
             exec.EnsureExit();
@@ -32,7 +22,7 @@ namespace JacobZ.Fluss.AudioCodec
 
         public void Encode(Stream input, string outputFile)
         {
-            Process exec = ProcessHelper.Generate(_wvpack, "-c", "-", outputFile);
+            Process exec = ProcessHelper.Generate(_tta, "-e", "-", outputFile);
             exec.Start();
             input.CopyTo(exec.StandardInput.BaseStream);
             exec.StandardInput.Close();
