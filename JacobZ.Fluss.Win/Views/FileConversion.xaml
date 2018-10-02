@@ -21,21 +21,17 @@
         <ListView x:Name="OriginFileView" Margin="4,8"
                   ItemsSource="{Binding SourceList}" DisplayMemberPath="FilePath"
                   SelectionChanged="OriginFileView_SelectionChanged">
-            <!--<ListView.View>
+        </ListView>
+        <ListView x:Name="ConvertedFileView" Margin="4,8" Grid.Column="1"
+                  ItemsSource="{Binding OutputList}">
+            <ListView.View>
                 <GridView>
                     <GridViewColumn Width="200" Header="File Name"
-                                    DisplayMemberBinding="{Binding FilePath}"/>
+                                    DisplayMemberBinding="{Binding FileName}"/>
+                    
                 </GridView>
-            </ListView.View>-->
-            <!--<ListView.ItemTemplate>
-                <DataTemplate DataType="{x:Type model:SourceItem}">
-                    <Grid>
-                        <TextBlock Text="{Binding FileName}"/>
-                    </Grid>
-                </DataTemplate>
-            </ListView.ItemTemplate>-->
+            </ListView.View>
         </ListView>
-        <ListView x:Name="ConvertFileView" Margin="4,8" Grid.Column="1"></ListView>
         <Grid Grid.Row="1" Grid.ColumnSpan="2">
             <Grid.RowDefinitions>
                 <RowDefinition/>
@@ -48,20 +44,17 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock VerticalAlignment="Center">执行操作：</TextBlock>
-                <ComboBox Grid.Column="1" x:Name="PossibleOps">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding Name}"/>
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
+                <ComboBox Grid.Column="1" x:Name="PossibleOps"
+                          SelectionChanged="PossibleOps_SelectionChanged"
+                          DisplayMemberPath="Name"/>
                 <Button Grid.Column="2" Width="40" Height="28" Margin="4,0">选项</Button>
             </Grid>
             <StackPanel Grid.Row="1" Height="32" Orientation="Horizontal" Margin="8">
                 <TextBlock VerticalAlignment="Center">输出分类：</TextBlock>
                 <ComboBox Width="240"/>
-                <Button Margin="8,0,4,0" Width="64">添加处理</Button>
-                <Button Margin="4,0" Width="64">删除处理</Button>
+                <Button x:Name="AddOp" Click="AddOp_Click"
+                        Margin="8,0,4,0" Width="64" IsEnabled="False">添加处理</Button>
+                <Button x:Name="RemoveOp" Margin="4,0" Width="64" IsEnabled="False">删除处理</Button>
             </StackPanel>
         </Grid>
     </Grid>

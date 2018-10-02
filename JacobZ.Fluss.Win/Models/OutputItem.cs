@@ -4,9 +4,9 @@ using JacobZ.Fluss.Win.Operations;
 
 namespace JacobZ.Fluss.Win.Models
 {
-    sealed class SourceItem
+    sealed class OutputItem
     {
-        public string FilePath { get; set; }
+        public string FileName { get; set; }
         public ISourceOperation[] RelatedOperations { get; set; }
     }
 }

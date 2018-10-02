@@ -62,5 +62,17 @@ namespace JacobZ.Fluss.Win
         {
             RootPathChanged.Invoke(this, RootPath.Text);
         }
+
+        private void BrowseOutput_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new CommonOpenFileDialog()
+            {
+                IsFolderPicker = true
+            };
+            var result = dialog.ShowDialog(new WindowInteropHelper(this).Handle);
+            if (result != CommonFileDialogResult.Ok) return;
+
+            OutputPath.Text = dialog.FileName;
+        }
     }
 }

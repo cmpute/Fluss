@@ -35,7 +35,7 @@ namespace JacobZ.Fluss.Win.Views
         static FileConversion _instance;
         public static FileConversion Instance { get => _instance; }
 
-        public ObservableCollection<SourceItem> SourceList
+        private ObservableCollection<SourceItem> SourceList
         {
             get { return (ObservableCollection<SourceItem>)GetValue(SourceListProperty); }
             set { SetValue(SourceListProperty, value); }
@@ -67,7 +67,7 @@ namespace JacobZ.Fluss.Win.Views
             }
         }
 
-        public ObservableCollection<SourceItem> SourceSelected
+        private ObservableCollection<SourceItem> SourceSelected
         {
             get { return (ObservableCollection<SourceItem>)GetValue(SourceSelectedProperty); }
             set { SetValue(SourceSelectedProperty, value); }
@@ -75,18 +75,42 @@ namespace JacobZ.Fluss.Win.Views
         public static readonly DependencyProperty SourceSelectedProperty =
             DependencyProperty.Register("SourceSelected", typeof(ObservableCollection<SourceItem>), typeof(MainWindow), new PropertyMetadata(null));
 
+        private ObservableCollection<OutputItem> OutputList
+        {
+            get { return (ObservableCollection<SourceItem>)GetValue(OutputListProperty); }
+            set { SetValue(OutputListProperty, value); }
+        }
+        public static readonly DependencyProperty OutputListProperty =
+            DependencyProperty.Register("OutputList", typeof(ObservableCollection<OutputItem>), typeof(MainWindow), new PropertyMetadata(null));
+
         private void OriginFileView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             foreach (var item in e.RemovedItems)
                 SourceSelected.Remove(item as SourceItem);
             foreach (var item in e.AddedItems)
                 SourceSelected.Add(item as SourceItem);
+            RefreshAddOpButtonState();
+        }
+
+        private void PossibleOps_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            RefreshAddOpButtonState();
         }
 
         private void SourceSelected_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             PossibleOps.ItemsSource = OperationFinder.OperationInstances.Where(
                 op => SourceSelected.All(source => op.CheckUsable(source.FilePath)));
+        }
+
+        private void RefreshAddOpButtonState()
+        {
+            AddOp.IsEnabled = SourceSelected.Count > 0 && PossibleOps.SelectedItem != null;
+        }
+
+        private void AddOp_Click(object sender, RoutedEventArgs e)
+        {
+            
         }
     }
 }
