@@ -15,24 +15,23 @@ namespace JacobZ.Fluss.Audio
             _wvpack = wavpackPath;
             _wvunpack = wvunpackPath;
         }
-
         public WavPack(string wavpackPath)
         {
             _wvpack = wavpackPath;
             _wvunpack = Path.Combine(Path.GetDirectoryName(wavpackPath), "wvunpack" + Path.GetExtension(wavpackPath));
         }
 
-        public void Decode(Stream output, string inputFile)
+        public Stream Decode(string inputFile, PcmEncodingType type)
         {
             Process exec = ProcessHelper.Generate(_wvunpack, inputFile, "-");
+            exec.StandardInput.Close();
             exec.Start();
-            exec.StandardOutput.BaseStream.CopyTo(output);
-            exec.EnsureExit();
+            return new ProcessStream(exec, ProcessPipeType.Stdout);
         }
 
-        public void Encode(Stream input, string outputFile)
+        public void Encode(string outputFile, Stream input, PcmEncodingType type)
         {
-            Process exec = ProcessHelper.Generate(_wvpack, "-c", "-", outputFile);
+            Process exec = ProcessHelper.Generate(_wvpack, "-b192", "-c", "-", outputFile);
             exec.Start();
             input.CopyTo(exec.StandardInput.BaseStream);
             exec.StandardInput.Close();

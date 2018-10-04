@@ -5,14 +5,14 @@ namespace JacobZ.Fluss.Audio
     public interface IPcmCodec
     {
         /// <summary>
-        /// 编码音频文件
+        /// Encode audio into file
         /// </summary>
-        void Encode(Stream input, string outputFile);
+        void Encode(string outputFile, Stream input, PcmEncodingType type);
 
         /// <summary>
-        /// 解码音频文件
+        /// Decode audio from file
         /// </summary>
-        void Decode(Stream output, string inputFile);
+        Stream Decode(string inputFile, PcmEncodingType type);
 
         void ReadTags(string input);
 

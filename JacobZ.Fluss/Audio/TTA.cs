@@ -12,15 +12,14 @@ namespace JacobZ.Fluss.Audio
 
         public TTA(string ttaPath) { _tta = ttaPath; }
 
-        public void Decode(Stream output, string inputFile)
+        public Stream Decode(string inputFile, PcmEncodingType type)
         {
             Process exec = ProcessHelper.Generate(_tta, "-d", inputFile, "-");
             exec.Start();
-            exec.StandardOutput.BaseStream.CopyTo(output);
-            exec.EnsureExit();
+            return new ProcessStream(exec, ProcessPipeType.Stdout);
         }
 
-        public void Encode(Stream input, string outputFile)
+        public void Encode(string outputFile, Stream input, PcmEncodingType type)
         {
             Process exec = ProcessHelper.Generate(_tta, "-e", "-", outputFile);
             exec.Start();
