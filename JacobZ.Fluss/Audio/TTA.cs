@@ -27,15 +27,5 @@ namespace JacobZ.Fluss.Audio
             exec.StandardInput.Close();
             exec.EnsureExit();
         }
-
-        public void ReadTags(string input)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void WriteTags(string output)
-        {
-            throw new NotImplementedException();
-        }
     }
 }

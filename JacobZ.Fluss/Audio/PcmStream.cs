@@ -3,6 +3,8 @@ using System.IO;
 using System.Collections.Generic;
 using TextEncoding = System.Text.Encoding;
 using JacobZ.Fluss.Utils;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace JacobZ.Fluss.Audio
 {
@@ -66,6 +68,31 @@ namespace JacobZ.Fluss.Audio
         {
             Format = format;
             Encoding = PcmEncodingType.RAW;
+        }
+
+        public void CopyHeaderTo(Stream destination)
+        {
+            switch(Encoding)
+            {
+                default:
+                case PcmEncodingType.RAW:
+                    break;
+                case PcmEncodingType.RIFF:
+                    BinaryWriter bw = new BinaryWriter(destination);
+                    bw.Write(new char[] { 'R', 'I', 'F', 'F' });
+                    bw.Write((uint)(BaseStream.Length + 36), true);
+                    bw.Write(new char[] { 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ' });
+                    bw.Write((uint)16, true);
+                    bw.Write((ushort)WAVE_FORMAT_PCM, true);
+                    bw.Write((ushort)Format.Channels, true);
+                    bw.Write((uint)Format.SampleRate, true);
+                    bw.Write((uint)(Format.SampleRate * Format.SampleWidth * Format.Channels / 8), true);
+                    bw.Write((ushort)Format.BlockAlign, true);
+                    bw.Write((ushort)Format.SampleWidth, true);
+                    bw.Write(new char[] { 'd', 'a', 't', 'a' });
+                    bw.Write((uint)BaseStream.Length, true);
+                    break;
+            }
         }
     }
 }

@@ -13,9 +13,5 @@ namespace JacobZ.Fluss.Audio
         /// Decode audio from file
         /// </summary>
         Stream Decode(string inputFile, PcmEncodingType type);
-
-        void ReadTags(string input);
-
-        void WriteTags(string output);
     }
 }

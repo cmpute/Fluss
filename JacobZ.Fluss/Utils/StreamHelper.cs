@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 
 namespace JacobZ.Fluss.Utils
@@ -55,6 +56,30 @@ namespace JacobZ.Fluss.Utils
         {
             byte[] buffer = ReadBytesR(reader, 8, isLittleEndian != BitConverter.IsLittleEndian);
             return BitConverter.ToUInt64(buffer, 0);
+        }
+
+        public static void WriteBytesR(BinaryWriter writer, byte[] bytes, bool reverse)
+        {
+            if (reverse)
+                foreach (var b in bytes.Reverse())
+                    writer.Write(b);
+            else foreach (var b in bytes)
+                    writer.Write(b);
+        }
+
+        public static void Write(this BinaryWriter writer, ushort value, bool isLittleEndian)
+        {
+            WriteBytesR(writer, BitConverter.GetBytes(value), isLittleEndian != BitConverter.IsLittleEndian);
+        }
+
+        public static void Write(this BinaryWriter writer, uint value, bool isLittleEndian)
+        {
+            WriteBytesR(writer, BitConverter.GetBytes(value), isLittleEndian != BitConverter.IsLittleEndian);
+        }
+
+        public static void Write(this BinaryWriter writer, ulong value, bool isLittleEndian)
+        {
+            WriteBytesR(writer, BitConverter.GetBytes(value), isLittleEndian != BitConverter.IsLittleEndian);
         }
     }
 

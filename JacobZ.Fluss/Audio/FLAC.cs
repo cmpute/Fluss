@@ -6,24 +6,18 @@ namespace JacobZ.Fluss.Audio
 {
     using JacobZ.Fluss.Utils;
 
-    public class WavPack : IPcmCodec
+    public class FLAC : IPcmCodec
     {
-        string _wvpack, _wvunpack;
+        string _flac;
 
-        public WavPack(string wavpackPath, string wvunpackPath)
+        public FLAC(string flacPath)
         {
-            _wvpack = wavpackPath;
-            _wvunpack = wvunpackPath;
+            _flac = flacPath;
         }
-        public WavPack(string wavpackPath)
-        {
-            _wvpack = wavpackPath;
-            _wvunpack = Path.Combine(Path.GetDirectoryName(wavpackPath), "wvunpack" + Path.GetExtension(wavpackPath));
-        }
-
+        
         public Stream Decode(string inputFile, PcmEncodingType type)
         {
-            Process exec = ProcessHelper.Generate(_wvunpack, inputFile, "-");
+            Process exec = ProcessHelper.Generate(_flac, "-b", "-c", inputFile);
             exec.StandardInput.Close();
             exec.Start();
             return new ProcessStream(exec, ProcessPipeType.Stdout);
@@ -31,7 +25,7 @@ namespace JacobZ.Fluss.Audio
 
         public void Encode(string outputFile, Stream input, PcmEncodingType type)
         {
-            Process exec = ProcessHelper.Generate(_wvpack, "-b192", "-c", "-", outputFile);
+            Process exec = ProcessHelper.Generate(_flac, "-", "-o", outputFile);
             exec.Start();
             input.CopyTo(exec.StandardInput.BaseStream);
             exec.StandardInput.Close();

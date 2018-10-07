@@ -18,5 +18,8 @@ namespace JacobZ.Fluss.Audio
         /// <see cref="WaveFormat.SampleWidth"/> / 8
         /// </remarks>
         public uint BlockAlign { get; set; }
+
+        /// <summary> Bits per second </summary>
+        public uint Bitrate => SampleWidth * Channels * SampleRate;
     }
 }

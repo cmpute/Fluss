@@ -4,7 +4,8 @@ using System.Text;
 
 namespace JacobZ.Fluss.Audio
 {
-    class EncodeSettings
+    public class EncodeSettings
     {
+        public float CompressionLevel { get; set; }
     }
 }
