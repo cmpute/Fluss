@@ -5,10 +5,17 @@ using SharpCompress.Archives;
 
 namespace JacobZ.Fluss.Operation
 {
-    interface IArchiveOperation
+    interface IArchiveEntryOperation
     {
         bool CheckCompatibilty(IArchiveEntry entry);
 
-        void Execute(IArchiveEntry entry, string outputPath);
+        void Execute(string outputPath, params IArchiveEntry[] entry);
+    }
+    
+    interface IArchiveOperation
+    {
+        bool CheckCompatibility(IArchive archive);
+
+        void Execute(string outputPath, IArchive archive);
     }
 }

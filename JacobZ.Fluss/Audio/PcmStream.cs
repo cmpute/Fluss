@@ -94,5 +94,8 @@ namespace JacobZ.Fluss.Audio
                     break;
             }
         }
+
+        public TimeSpan TimePosition { get => throw new NotImplementedException(); }
+        public TimeSpan Duration { get => throw new NotImplementedException(); }
     }
 }

@@ -8,9 +8,9 @@ using Ude;
 
 namespace JacobZ.Fluss.Operation
 {
-    public class FixEncoding : IArchiveOperation
+    public class FixEncoding : IArchiveEntryOperation
     {
-        public void Execute(IArchiveEntry entry, string outputPath)
+        public static Encoding DetectEncoding(IArchiveEntry entry)
         {
             var stream = entry.OpenEntryStream();
 
@@ -54,14 +54,19 @@ namespace JacobZ.Fluss.Operation
                         encoding = Encoding.UTF8;
                         break;
                 };
-
-                stream = entry.OpenEntryStream();
-                var sr = new StreamReader(stream, encoding);
-                var sw = new StreamWriter(File.OpenWrite(outputPath),
-                    new UTF8Encoding(true)); // Add BOM by default for foobar
-                sw.Write(sr.ReadToEnd());
-                sr.Close(); sw.Close();
             }
+            return encoding;
+        }
+
+        public void Execute(string outputPath, params IArchiveEntry[] entry)
+        {
+            var encoding = DetectEncoding(entry[0]);
+            var stream = entry[0].OpenEntryStream();
+            var sr = new StreamReader(stream, encoding);
+            var sw = new StreamWriter(File.OpenWrite(outputPath),
+                new UTF8Encoding(true)); // Add BOM by default for foobar
+            sw.Write(sr.ReadToEnd());
+            sr.Close(); sw.Close();
         }
 
         readonly string[] _supportext = new string[] { ".log", ".txt", ".cue" };

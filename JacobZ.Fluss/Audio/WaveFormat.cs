@@ -21,5 +21,9 @@ namespace JacobZ.Fluss.Audio
 
         /// <summary> Bits per second </summary>
         public uint Bitrate => SampleWidth * Channels * SampleRate;
+
+        public static readonly string[] WaveExtensions = {
+            ".flac", ".wv", ".tta"
+        };
     }
 }
