@@ -8,20 +8,18 @@ namespace JacobZ.Fluss.Audio
 
     public class TTA : IPcmCodec
     {
-        string _tta;
-
-        public TTA(string ttaPath) { _tta = ttaPath; }
+        public static string TTAPath { get; set; }
 
         public Stream Decode(string inputFile, PcmEncodingType type)
         {
-            Process exec = ProcessHelper.Generate(_tta, "-d", inputFile, "-");
+            Process exec = ProcessHelper.Generate(TTAPath, "-d", inputFile, "-");
             exec.Start();
             return new ProcessStream(exec, ProcessPipeType.Stdout);
         }
 
         public void Encode(string outputFile, Stream input, PcmEncodingType type)
         {
-            Process exec = ProcessHelper.Generate(_tta, "-e", "-", outputFile);
+            Process exec = ProcessHelper.Generate(TTAPath, "-e", "-", outputFile);
             exec.Start();
             input.CopyTo(exec.StandardInput.BaseStream);
             exec.StandardInput.Close();

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using JacobZ.Fluss.AudioCodec;
+using JacobZ.Fluss.Audio;
 
 namespace JacobZ.Fluss.Win.Operations
 {
@@ -46,7 +46,8 @@ namespace JacobZ.Fluss.Win.Operations
                 case EXT_Wave:
                     return null;
                 case EXT_TrueAudio:
-                    return new TTA(Utils.ProgramFinder.FindAudioEncoder<TTA>());
+                    Utils.ProgramFinder.FindTTA();
+                    return new TTA();
             }
         }
 
@@ -57,10 +58,7 @@ namespace JacobZ.Fluss.Win.Operations
 
             await Task.Run(() =>
             {
-                MemoryStream ms = new System.IO.MemoryStream();
-                decoder.Decode(ms, targetFile);
-                ms.Seek(0, SeekOrigin.Begin);
-                encoder.Encode(ms, outputfile);
+                encoder.Encode(outputfile, decoder.Decode(targetFile, PcmEncodingType.RIFF), PcmEncodingType.RIFF);
             });
         }
 

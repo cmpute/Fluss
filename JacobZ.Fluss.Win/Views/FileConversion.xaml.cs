@@ -1,6 +1,4 @@
-﻿using JacobZ.Fluss.Archiver;
 using JacobZ.Fluss.Win.Models;
-using JacobZ.Fluss.Win.Operations;
 using JacobZ.Fluss.Win.Utils;
 using System;
 using System.Collections.Generic;
@@ -9,6 +7,8 @@ using System.Linq;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using SharpCompress.Common;
+using SharpCompress.Archives;
 
 namespace JacobZ.Fluss.Win.Views
 {
@@ -24,7 +24,7 @@ namespace JacobZ.Fluss.Win.Views
             InitializeComponent();
             DataContext = this;
             _instance = this;
-            _owner = owner;;
+            _owner = owner;
 
             SourceList = new ObservableCollection<SourceItem>();
             SourceSelected = new ObservableCollection<SourceItem>();
@@ -53,17 +53,17 @@ namespace JacobZ.Fluss.Win.Views
                     SourceList.Add(new SourceItem() { FilePath = item.Substring(path.Length + 1) });
             else
             {
-                Archiver.IArchiver archiver;
+                IArchive archive;
                 switch(ext)
                 {
                     case ".rar":
-                        archiver = new RAR(Utils.ProgramFinder.FindArchiver<RAR>());
+                        archive = SharpCompress.Archives.Rar.RarArchive.Open(new FileInfo(path));
                         break;
                     default:
                         throw new NotSupportedException("Not supported archive format!");
                 }
-                foreach (var item in archiver.GetContentList(path))
-                    SourceList.Add(new SourceItem() { FilePath = item });
+                foreach (var item in archive.Entries.Where(item => !item.IsDirectory))
+                    SourceList.Add(new SourceItem() { FilePath = item.Key });
             }
         }
 
@@ -77,7 +77,7 @@ namespace JacobZ.Fluss.Win.Views
 
         private ObservableCollection<OutputItem> OutputList
         {
-            get { return (ObservableCollection<SourceItem>)GetValue(OutputListProperty); }
+            get { return (ObservableCollection<OutputItem>)GetValue(OutputListProperty); }
             set { SetValue(OutputListProperty, value); }
         }
         public static readonly DependencyProperty OutputListProperty =
@@ -99,8 +99,9 @@ namespace JacobZ.Fluss.Win.Views
 
         private void SourceSelected_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
-            PossibleOps.ItemsSource = OperationFinder.OperationInstances.Where(
-                op => SourceSelected.All(source => op.CheckUsable(source.FilePath)));
+            // TODO: Fix operations
+            // PossibleOps.ItemsSource = OperationFinder.OperationInstances.Where(
+            //     op => SourceSelected.All(source => op.CheckUsable(source.FilePath)));
         }
 
         private void RefreshAddOpButtonState()

@@ -38,7 +38,7 @@ namespace JacobZ.Fluss.Operation
                 detector.DataEnd();
                 switch (detector.Charset)
                 {
-                    case Ude.Charsets.SHIFT_JIS:
+                    case Charsets.SHIFT_JIS:
                         encoding = Encoding.GetEncoding(932);
                         break;
                     case Charsets.BIG5:

@@ -8,22 +8,12 @@ namespace JacobZ.Fluss.Audio
 
     public class WavPack : IPcmCodec
     {
-        string _wvpack, _wvunpack;
-
-        public WavPack(string wavpackPath, string wvunpackPath)
-        {
-            _wvpack = wavpackPath;
-            _wvunpack = wvunpackPath;
-        }
-        public WavPack(string wavpackPath)
-        {
-            _wvpack = wavpackPath;
-            _wvunpack = Path.Combine(Path.GetDirectoryName(wavpackPath), "wvunpack" + Path.GetExtension(wavpackPath));
-        }
+        public static string WavPackPath { get; set; }
 
         public Stream Decode(string inputFile, PcmEncodingType type)
         {
-            Process exec = ProcessHelper.Generate(_wvunpack, inputFile, "-");
+            var wvunpack = Path.Combine(Path.GetDirectoryName(WavPackPath), "wvunpack" + Path.GetExtension(WavPackPath));
+            Process exec = ProcessHelper.Generate(wvunpack, inputFile, "-");
             exec.StandardInput.Close();
             exec.Start();
             return new ProcessStream(exec, ProcessPipeType.Stdout);
@@ -31,7 +21,7 @@ namespace JacobZ.Fluss.Audio
 
         public void Encode(string outputFile, Stream input, PcmEncodingType type)
         {
-            Process exec = ProcessHelper.Generate(_wvpack, "-b192", "-c", "-", outputFile);
+            Process exec = ProcessHelper.Generate(WavPackPath, "-b192", "-c", "-", outputFile);
             exec.Start();
             input.CopyTo(exec.StandardInput.BaseStream);
             exec.StandardInput.Close();

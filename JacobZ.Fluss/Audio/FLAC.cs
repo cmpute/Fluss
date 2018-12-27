@@ -8,16 +8,11 @@ namespace JacobZ.Fluss.Audio
 
     public class FLAC : IPcmCodec
     {
-        string _flac;
-
-        public FLAC(string flacPath)
-        {
-            _flac = flacPath;
-        }
+        public static string FLACPath { get; set; }
         
         public Stream Decode(string inputFile, PcmEncodingType type)
         {
-            Process exec = ProcessHelper.Generate(_flac, "-b", "-c", inputFile);
+            Process exec = ProcessHelper.Generate(FLACPath, "-b", "-c", inputFile);
             exec.StandardInput.Close();
             exec.Start();
             return new ProcessStream(exec, ProcessPipeType.Stdout);
@@ -25,7 +20,7 @@ namespace JacobZ.Fluss.Audio
 
         public void Encode(string outputFile, Stream input, PcmEncodingType type)
         {
-            Process exec = ProcessHelper.Generate(_flac, "-", "-o", outputFile);
+            Process exec = ProcessHelper.Generate(FLACPath, "-", "-o", outputFile);
             exec.Start();
             input.CopyTo(exec.StandardInput.BaseStream);
             exec.StandardInput.Close();
