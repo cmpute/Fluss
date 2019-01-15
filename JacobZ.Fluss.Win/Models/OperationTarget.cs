@@ -1,16 +1,42 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using SharpCompress.Archives;
 
 namespace JacobZ.Fluss.Win.Models
 {
-    sealed class OperationTarget
+    public sealed class OperationTarget : INotifyPropertyChanged
     {
-        public MusicArchive Archive { get; set; }
-        public int EntryIndex { get; set; }
-        public bool IsSource { get; set; }
+        public OperationTarget()
+        {
+            System.Diagnostics.Debug.WriteLine(GetHashCode());
+        }
 
-        public IArchiveEntry Entry => Archive.Entries[EntryIndex];
-        public string FilePath => Entry.Key;
+        public OperationTargetKind Kind { get; set; }
+        IArchiveEntry _entry;
+        public IArchiveEntry Entry
+        {
+            get { return _entry; }
+            set
+            {
+                if (_entry == value)
+                    return;
+                _entry = value; OnPropertyChanged();
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public enum OperationTargetKind
+    {
+        Input,
+        Output,
+        Temporary
     }
 }

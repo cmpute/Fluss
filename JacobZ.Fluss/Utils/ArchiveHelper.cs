@@ -41,7 +41,7 @@ namespace JacobZ.Fluss.Utils
         internal FileInfo File { get; set; }
         internal DirectoryInfo Root { get; set; }
 
-        internal DirectoryArchiveEntry(string file, DirectoryInfo root)
+        public DirectoryArchiveEntry(string file, DirectoryInfo root)
         {
             File = new FileInfo(file);
             Root = root;

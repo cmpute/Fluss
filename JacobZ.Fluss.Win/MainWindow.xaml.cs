@@ -1,11 +1,14 @@
 ﻿using Microsoft.WindowsAPICodePack.Dialogs;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using SharpCompress.Archives;
 using JacobZ.Fluss.Utils;
+using JacobZ.Fluss.Win.Models;
+using JacobZ.Fluss.Win.Utils;
 
 namespace JacobZ.Fluss.Win
 {
@@ -59,9 +62,22 @@ namespace JacobZ.Fluss.Win
             RootPath.Text = dialog.FileName;
         }
 
+        private void BrowseOutput_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new CommonOpenFileDialog()
+            {
+                IsFolderPicker = true
+            };
+            var result = dialog.ShowDialog(new WindowInteropHelper(this).Handle);
+            if (result != CommonFileDialogResult.Ok) return;
+
+            OutputPath.Text = dialog.FileName;
+        }
+
+        #region State Variables
+
         public event EventHandler<string> RootPathChanged;
         public MusicArchive Archive { get; set; }
-
         private void RootPath_TextChanged(object sender, TextChangedEventArgs e)
         {
             // Update archive object
@@ -83,22 +99,17 @@ namespace JacobZ.Fluss.Win
                         throw new NotSupportedException("Not supported archive format!");
                 }
             }
-            Archive = new MusicArchive(archive);
+            Archive = new MusicArchive(archive, RootPath.Text);
+
+            // Clear archive operations
+            OperationQueue = new PipelineGraph();
 
             // Notify pages
             RootPathChanged.Invoke(this, RootPath.Text);
         }
 
-        private void BrowseOutput_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new CommonOpenFileDialog()
-            {
-                IsFolderPicker = true
-            };
-            var result = dialog.ShowDialog(new WindowInteropHelper(this).Handle);
-            if (result != CommonFileDialogResult.Ok) return;
+        public PipelineGraph OperationQueue { get; set; }
 
-            OutputPath.Text = dialog.FileName;
-        }
+        #endregion
     }
 }

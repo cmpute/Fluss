@@ -18,6 +18,8 @@ namespace JacobZ.Fluss.Win.Views
     /// </summary>
     public partial class FileConversion : Page
     {
+        static readonly string TempPath = Path.GetTempPath() + "/fluss";
+
         MainWindow _owner;
 
         public FileConversion(MainWindow owner)
@@ -25,13 +27,13 @@ namespace JacobZ.Fluss.Win.Views
             InitializeComponent();
             DataContext = this;
             _instance = this;
-            _owner = owner;
 
-            SourceList = new ObservableCollection<OperationTarget>();
-            SourceSelected = new ObservableCollection<OperationTarget>();
-            MiddleList = new ObservableCollection<OperationTarget>();
-            SourceSelected.CollectionChanged += SourceSelected_CollectionChanged;
+            _owner = owner;
             _owner.RootPathChanged += Owner_RootPathChanged;
+            SourceSelected = new ObservableCollection<OperationTarget>();
+            OutputSelected = new ObservableCollection<OperationTarget>();
+            SourceSelected.CollectionChanged += SourceSelected_CollectionChanged;
+            OutputSelected.CollectionChanged += OutputSelected_CollectionChanged;
         }
 
         static FileConversion _instance;
@@ -40,9 +42,12 @@ namespace JacobZ.Fluss.Win.Views
         private void Owner_RootPathChanged(object sender, string path)
         {
             SourceList.Clear();
-            int counter = 0;
             foreach (var item in _owner.Archive.Entries.Where(item => !item.IsDirectory))
-                SourceList.Add(new OperationTarget() { Archive = _owner.Archive, EntryIndex = counter++, IsSource = true });
+                SourceList.Add(new OperationTarget()
+                {
+                    Entry = item,
+                    Kind = OperationTargetKind.Input
+                });
         }
 
         private ObservableCollection<OperationTarget> SourceList
@@ -51,15 +56,9 @@ namespace JacobZ.Fluss.Win.Views
             set { SetValue(SourceListProperty, value); }
         }
         public static readonly DependencyProperty SourceListProperty =
-            DependencyProperty.Register("SourceList", typeof(ObservableCollection<OperationTarget>), typeof(FileConversion), new PropertyMetadata(null));
+            DependencyProperty.Register("SourceList", typeof(ObservableCollection<OperationTarget>), typeof(FileConversion), new PropertyMetadata(new ObservableCollection<OperationTarget>()));
 
-        private ObservableCollection<OperationTarget> SourceSelected
-        {
-            get { return (ObservableCollection<OperationTarget>)GetValue(SourceSelectedProperty); }
-            set { SetValue(SourceSelectedProperty, value); }
-        }
-        public static readonly DependencyProperty SourceSelectedProperty =
-            DependencyProperty.Register("SourceSelected", typeof(ObservableCollection<OperationTarget>), typeof(FileConversion), new PropertyMetadata(null));
+        private ObservableCollection<OperationTarget> SourceSelected;
 
         private ObservableCollection<OperationTarget> MiddleList
         {
@@ -67,7 +66,7 @@ namespace JacobZ.Fluss.Win.Views
             set { SetValue(MiddleListProperty, value); }
         }
         public static readonly DependencyProperty MiddleListProperty =
-            DependencyProperty.Register("MiddleList", typeof(ObservableCollection<OperationTarget>), typeof(FileConversion), new PropertyMetadata(null));
+            DependencyProperty.Register("MiddleList", typeof(ObservableCollection<OperationTarget>), typeof(FileConversion), new PropertyMetadata(new ObservableCollection<OperationTarget>()));
 
         private ObservableCollection<OperationTarget> OutputList
         {
@@ -75,7 +74,9 @@ namespace JacobZ.Fluss.Win.Views
             set { SetValue(OutputListProperty, value); }
         }
         public static readonly DependencyProperty OutputListProperty =
-            DependencyProperty.Register("OutputList", typeof(ObservableCollection<OperationTarget>), typeof(FileConversion), new PropertyMetadata(null));
+            DependencyProperty.Register("OutputList", typeof(ObservableCollection<OperationTarget>), typeof(FileConversion), new PropertyMetadata(new ObservableCollection<OperationTarget>()));
+
+        private ObservableCollection<OperationTarget> OutputSelected;
 
         private bool BatchWhenAdd
         {
@@ -91,34 +92,63 @@ namespace JacobZ.Fluss.Win.Views
                 SourceSelected.Remove(item as OperationTarget);
             foreach (var item in e.AddedItems)
                 SourceSelected.Add(item as OperationTarget);
-            RefreshAddOpButtonState();
+            RefreshButtonState();
         }
 
         private void MiddleFileView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             foreach (var item in e.RemovedItems)
+            {
                 SourceSelected.Remove(item as OperationTarget);
+                OutputSelected.Remove(item as OperationTarget);
+            }
             foreach (var item in e.AddedItems)
+            {
                 SourceSelected.Add(item as OperationTarget);
-            RefreshAddOpButtonState();
+                OutputSelected.Add(item as OperationTarget);
+            }
+            RefreshButtonState();
+        }
+
+        private void ConvertedFileView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            foreach (var item in e.RemovedItems)
+                OutputSelected.Remove(item as OperationTarget);
+            foreach (var item in e.AddedItems)
+                OutputSelected.Add(item as OperationTarget);
+            RefreshButtonState();
         }
 
         private void PossibleOps_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            RefreshAddOpButtonState();
+            RefreshButtonState();
         }
 
         private void SourceSelected_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             if (SourceSelected.Count > 0)
                 PossibleOps.ItemsSource = OperationFactory.EntryOperationTypes.Where(
-                op => OperationFactory.CheckOperation(op, SourceSelected.Select(target => target.Entry).ToArray()));
+                    op => OperationFactory.CheckOperation(op, SourceSelected.Select(target => target.Entry).ToArray()));
             else PossibleOps.ItemsSource = null;
+        }
+
+        private void OutputSelected_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (OutputSelected.Count == 1)
+            {
+                OutputPath.IsEnabled = true;
+                OutputPath.Text = OutputSelected[0].Entry.Key;
+            }
+            else
+            {
+                OutputPath.IsEnabled = false;
+                OutputPath.Text = string.Empty;
+            }
         }
 
         private void BatchWhenAdd_PropertyChanged(DependencyObject dp, DependencyPropertyChangedEventArgs e)
         {
-            RefreshAddOpButtonState();
+            RefreshButtonState();
         }
 
         private IEnumerable<EntryCategory> CategoryValues
@@ -130,14 +160,95 @@ namespace JacobZ.Fluss.Win.Views
             DependencyProperty.Register("CategoryValues", typeof(IEnumerable<EntryCategory>), typeof(FileConversion), new PropertyMetadata(
                 Enum.GetValues(typeof(EntryCategory)).Cast<EntryCategory>()));
 
-        private void RefreshAddOpButtonState() // TODO: implement this with bindings
+        private void RefreshButtonState() // TODO: implement this with bindings
         {
             AddOp.IsEnabled = SourceSelected.Count > 0 && PossibleOps.SelectedItem != null;
+            AddOutput.IsEnabled = MiddleFileView.SelectedItems.Count > 0;
+            RemoveOutput.IsEnabled = ConvertedFileView.SelectedItems.Count > 0;
+            RemoveItem.IsEnabled = OutputSelected.Count > 0;
+            OpOptions.IsEnabled = PossibleOps.SelectedItem != null;
         }
 
         private void AddOp_Click(object sender, RoutedEventArgs e)
         {
-            
+            var operation = OperationFactory.NewOperation(PossibleOps.SelectedItem as Type);
+            if (BatchAdd.IsChecked.Value)
+            {
+                foreach (var item in SourceSelected)
+                {
+                    var output_pred = operation.Pass(new IArchiveEntry[] { item.Entry });
+                    var output_list = output_pred.Select(path => new OperationTarget()
+                    {
+                        Entry = new DirectoryArchiveEntry(TempPath + path, new DirectoryInfo(TempPath)),
+                        Kind = OperationTargetKind.Temporary
+                    });
+                    _owner.OperationQueue.AddOperation(new OperationDelegate()
+                    {
+                        Inputs = new OperationTarget[] { item },
+                        Outputs = output_list.ToArray(),
+                        Operation = operation
+                    });
+                    foreach(var output in output_list)
+                        MiddleList.Add(output);
+                }
+            }
+            else
+            {
+                var output_pred = operation.Pass(SourceSelected.Select(item => item.Entry).ToArray());
+                var output_list = output_pred.Select(path => new OperationTarget()
+                {
+                    Entry = new DirectoryArchiveEntry(TempPath + path, new DirectoryInfo(TempPath)),
+                    Kind = OperationTargetKind.Temporary
+                }).ToArray();
+                _owner.OperationQueue.AddOperation(new OperationDelegate()
+                {
+                    Inputs = SourceSelected.ToArray(),
+                    Outputs = output_list,
+                    Operation = operation
+                });
+                foreach (var output in output_list)
+                    MiddleList.Add(output);
+            }
+        }
+
+        private void OutputPath_LostKeyboardFocus(object sender, System.Windows.Input.KeyboardFocusChangedEventArgs e)
+        {
+            OutputSelected[0].Entry = new DirectoryArchiveEntry(TempPath + OutputPath.Text, new DirectoryInfo(TempPath));
+        }
+
+        private void RemoveOutput_Click(object sender, RoutedEventArgs e)
+        {
+            Array copy = new object[ConvertedFileView.SelectedItems.Count];
+            ConvertedFileView.SelectedItems.CopyTo(copy, 0);
+            foreach (OperationTarget target in copy)
+            {
+                OutputList.Remove(target);
+                MiddleList.Add(target);
+                target.Kind = OperationTargetKind.Temporary;
+            }
+        }
+
+        private void AddOutput_Click(object sender, RoutedEventArgs e)
+        {
+            Array copy = new object[MiddleFileView.SelectedItems.Count];
+            MiddleFileView.SelectedItems.CopyTo(copy, 0);
+            foreach (OperationTarget target in copy)
+            {
+                MiddleList.Remove(target);
+                OutputList.Add(target);
+                target.Kind = OperationTargetKind.Output;
+            }
+        }
+
+        private void RemoveItem_Click(object sender, RoutedEventArgs e)
+        {
+            var list = OutputSelected.SelectMany(target =>
+                _owner.OperationQueue.RemoveTarget(target)).Distinct().ToArray();
+            foreach (var remove in list)
+            {
+                MiddleList.Remove(remove);
+                OutputList.Remove(remove);
+            }
         }
     }
 }

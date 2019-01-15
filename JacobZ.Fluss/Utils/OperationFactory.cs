@@ -28,5 +28,10 @@ namespace JacobZ.Fluss.Utils
             var opidx = _op_types.IndexOf(operation);
             return _op_instances[opidx].Pass(entries) != null;
         }
+
+        public static IArchiveEntryOperation NewOperation(Type operation)
+        {
+            return Activator.CreateInstance(operation) as IArchiveEntryOperation;
+        }
     }
 }

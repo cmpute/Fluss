@@ -55,7 +55,7 @@ namespace JacobZ.Fluss.Operation
         public string[] Pass(params IArchiveEntry[] entries)
         {
             var cueentry = entries.FirstOrDefault(et => et.Key.EndsWith(".cue"));
-            if(cueentry != null) return new string[] { cueentry.Key };
+            if (cueentry != null) return new string[] { Path.GetFileNameWithoutExtension(cueentry.Key) + ".fix.cue" };
             else return null;
         }
     }

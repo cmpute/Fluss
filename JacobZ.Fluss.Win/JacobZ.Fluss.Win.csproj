@@ -71,11 +71,8 @@
     <Compile Include="Models\EntryCategory.cs" />
     <Compile Include="Models\OperationDelegate.cs" />
     <Compile Include="Models\OperationTarget.cs" />
-    <Compile Include="Operations\CopyOperation.cs" />
-    <Compile Include="Operations\TargetClassifier.cs" />
+    <Compile Include="Utils\PipelineGraph.cs" />
     <Compile Include="Utils\ProgramFinder.cs" />
-    <Compile Include="Operations\AudioConverter.cs" />
-    <Compile Include="Operations\ISourceOperation.cs" />
     <Compile Include="Views\FileConversion.xaml.cs">
       <DependentUpon>FileConversion.xaml</DependentUpon>
     </Compile>

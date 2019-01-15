@@ -8,10 +8,12 @@ namespace JacobZ.Fluss.Win.Models
 {
     public enum EntryCategory
     {
-        Audio,
-        Booklet,
-        Lyrics,
-        Miscellaneous,
-        Special
+        BK, // booklet
+        CD, // compact disc
+        BD, // bluray disc
+        DVD, // digital versatile disc
+        LRC, // lyrics
+        MISC, // miscellaneous
+        SP, // special
     }
 }
