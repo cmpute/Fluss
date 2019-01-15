@@ -10,6 +10,8 @@ namespace JacobZ.Fluss.Operation
 {
     public class FixEncoding : IArchiveEntryOperation
     {
+        internal static readonly Encoding UTF8_BOM = new UTF8Encoding(true);
+
         public static Encoding DetectEncoding(IArchiveEntry entry)
         {
             var stream = entry.OpenEntryStream();
@@ -58,22 +60,25 @@ namespace JacobZ.Fluss.Operation
             return encoding;
         }
 
-        public void Execute(string outputPath, params IArchiveEntry[] entry)
+        public void Execute(IArchiveEntry[] entries, params string[] outputPath)
         {
-            var encoding = DetectEncoding(entry[0]);
-            var stream = entry[0].OpenEntryStream();
+            var entry = entries[0];
+            var encoding = DetectEncoding(entry);
+            var stream = entry.OpenEntryStream();
             var sr = new StreamReader(stream, encoding);
-            var sw = new StreamWriter(File.OpenWrite(outputPath),
-                new UTF8Encoding(true)); // Add BOM by default for foobar
+            var sw = new StreamWriter(File.OpenWrite(outputPath[0]), UTF8_BOM); // Add BOM by default for foobar
             sw.Write(sr.ReadToEnd());
             sr.Close(); sw.Close();
         }
 
-        readonly string[] _supportext = new string[] { ".log", ".txt", ".cue" };
-        public bool CheckCompatibilty(IArchiveEntry entry)
+        readonly string[] SupportText = new string[] { ".log", ".txt", ".cue" };
+        public string[] Pass(params IArchiveEntry[] entries)
         {
+            if (entries.Count() > 0) return null;
+            var entry = entries[0];
             var ext = Path.GetExtension(entry.Key);
-            return _supportext.Contains(ext);
+            if (SupportText.Contains(ext)) return new string[] { entry.Key };
+            else return null;
         }
     }
 }

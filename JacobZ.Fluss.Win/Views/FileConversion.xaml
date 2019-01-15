@@ -10,52 +10,73 @@
       d:DesignHeight="450" d:DesignWidth="800"
       Title="FileConversion">
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition/>
-            <ColumnDefinition/>
+            <ColumnDefinition Width="2*"/>
+            <ColumnDefinition Width="4"/>
+            <ColumnDefinition Width="3*"/>
         </Grid.ColumnDefinitions>
-        <ListView x:Name="OriginFileView" Margin="4,8"
-                  ItemsSource="{Binding SourceList}" DisplayMemberPath="FilePath"
-                  SelectionChanged="OriginFileView_SelectionChanged">
-        </ListView>
-        <ListView x:Name="ConvertedFileView" Margin="4,8" Grid.Column="1"
-                  ItemsSource="{Binding OutputList}">
-            <ListView.View>
-                <GridView>
-                    <GridViewColumn Width="200" Header="File Name"
-                                    DisplayMemberBinding="{Binding FileName}"/>
-                    
-                </GridView>
-            </ListView.View>
-        </ListView>
-        <Grid Grid.Row="1" Grid.ColumnSpan="2">
+        <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition/>
+                <RowDefinition Height="4"/>
                 <RowDefinition/>
             </Grid.RowDefinitions>
-            <Grid Margin="8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock VerticalAlignment="Center">执行操作：</TextBlock>
-                <ComboBox Grid.Column="1" x:Name="PossibleOps"
+            <ListView x:Name="OriginFileView" Margin="4,8"
+                      ItemsSource="{Binding SourceList}" DisplayMemberPath="FilePath"
+                      SelectionChanged="OriginFileView_SelectionChanged">
+            </ListView>
+            <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch"/>
+            <ListView x:Name="MiddleFileView" Margin="4,8" Grid.Row="2"
+                      ItemsSource="{Binding MiddleList}" DisplayMemberPath="FilePath"
+                      SelectionChanged="MiddleFileView_SelectionChanged">
+            </ListView>
+        </Grid>
+        <GridSplitter ResizeDirection="Columns" VerticalAlignment="Stretch" Grid.Column="1" HorizontalAlignment="Stretch"/>
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <ListView x:Name="ConvertedFileView" Margin="4,8"
+                  ItemsSource="{Binding OutputList}">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Width="200" Header="File Path"
+                                    DisplayMemberBinding="{Binding FilePath}"/>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+            <Grid Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+                <Grid Margin="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock VerticalAlignment="Center">执行操作：</TextBlock>
+                    <ComboBox Grid.Column="1" x:Name="PossibleOps"
                           SelectionChanged="PossibleOps_SelectionChanged"
                           DisplayMemberPath="Name"/>
-                <Button Grid.Column="2" Width="40" Height="28" Margin="4,0">选项</Button>
+                    <Button Grid.Column="2" Width="40" Height="28" Margin="4,0">选项</Button>
+                </Grid>
+                <Grid Margin="8" Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock VerticalAlignment="Center">输出分类：</TextBlock>
+                    <ComboBox x:Name="OutputCategory" Grid.Column="1" 
+                              ItemsSource="{Binding CategoryValues}"/>
+                    <CheckBox x:Name="BatchAdd" Grid.Column="2" VerticalAlignment="Center" Margin="4,0" IsChecked="{Binding BatchWhenAdd, Mode=TwoWay}">批量</CheckBox>
+                    <Button x:Name="AddOp" Click="AddOp_Click" Grid.Column="3" Height="28" Width="64" Margin="4,0" IsEnabled="False">添加处理</Button>
+                </Grid>
             </Grid>
-            <StackPanel Grid.Row="1" Height="32" Orientation="Horizontal" Margin="8">
-                <TextBlock VerticalAlignment="Center">输出分类：</TextBlock>
-                <ComboBox Width="240"/>
-                <Button x:Name="AddOp" Click="AddOp_Click"
-                        Margin="8,0,4,0" Width="64" IsEnabled="False">添加处理</Button>
-                <Button x:Name="RemoveOp" Margin="4,0" Width="64" IsEnabled="False">删除处理</Button>
-            </StackPanel>
         </Grid>
     </Grid>
 </Page>

@@ -68,8 +68,9 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="Models\OutputItem.cs" />
-    <Compile Include="Models\SourceItem.cs" />
+    <Compile Include="Models\EntryCategory.cs" />
+    <Compile Include="Models\OperationDelegate.cs" />
+    <Compile Include="Models\OperationTarget.cs" />
     <Compile Include="Operations\CopyOperation.cs" />
     <Compile Include="Operations\TargetClassifier.cs" />
     <Compile Include="Utils\ProgramFinder.cs" />

@@ -1,8 +1,11 @@
 ﻿using Microsoft.WindowsAPICodePack.Dialogs;
 using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using SharpCompress.Archives;
+using JacobZ.Fluss.Utils;
 
 namespace JacobZ.Fluss.Win
 {
@@ -57,9 +60,32 @@ namespace JacobZ.Fluss.Win
         }
 
         public event EventHandler<string> RootPathChanged;
+        public MusicArchive Archive { get; set; }
 
         private void RootPath_TextChanged(object sender, TextChangedEventArgs e)
         {
+            // Update archive object
+            IArchive archive;
+            var ext = Path.GetExtension(RootPath.Text);
+            if (ext.Length == 0)
+                archive = new DirectoryArchive(RootPath.Text);
+            else
+            {
+                switch (ext)
+                {
+                    case ".rar":
+                        archive = SharpCompress.Archives.Rar.RarArchive.Open(new FileInfo(RootPath.Text));
+                        break;
+                    case ".zip":
+                        archive = SharpCompress.Archives.Zip.ZipArchive.Open(new FileInfo(RootPath.Text));
+                        break;
+                    default:
+                        throw new NotSupportedException("Not supported archive format!");
+                }
+            }
+            Archive = new MusicArchive(archive);
+
+            // Notify pages
             RootPathChanged.Invoke(this, RootPath.Text);
         }
 

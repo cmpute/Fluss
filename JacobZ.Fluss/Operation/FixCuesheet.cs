@@ -9,21 +9,15 @@ namespace JacobZ.Fluss.Operation
 {
     public class FixCuesheet : IArchiveEntryOperation
     {
-        public bool CheckCompatibilty(IArchiveEntry entry)
+        public void Execute(IArchiveEntry[] entries, params string[] outputPath)
         {
-            var ext = Path.GetExtension(entry.Key);
-            return ext == ".cue";
-        }
-
-        public void Execute(string outputPath, params IArchiveEntry[] entry)
-        {
-            var cueentry = entry.First(et => et.Key.EndsWith(".cue"));
+            var cueentry = entries.First(et => et.Key.EndsWith(".cue"));
             var encoding = FixEncoding.DetectEncoding(cueentry);
-            var stream = entry[0].OpenEntryStream();
+            var stream = cueentry.OpenEntryStream();
             var sr = new StreamReader(stream, encoding);
 
             List<string> content = new List<string>();
-            List<string> entryNames = entry.Select(et => Path.GetFileName(et.Key)).ToList();
+            List<string> entryNames = entries.Select(et => Path.GetFileName(et.Key)).ToList();
             while (!sr.EndOfStream)
             {
                 var line = sr.ReadLine();
@@ -53,10 +47,16 @@ namespace JacobZ.Fluss.Operation
                 throw new Exception("Cannot find correspond wave file for the cuesheet!");
             }
 
-            var sw = new StreamWriter(File.OpenWrite(outputPath),
-                new UTF8Encoding(true)); // Add BOM by default for foobar
+            var sw = new StreamWriter(File.OpenWrite(outputPath[0]), FixEncoding.UTF8_BOM); // Add BOM by default for foobar
             sw.Write(string.Join(Environment.NewLine, content));
             sr.Close(); sw.Close();
+        }
+
+        public string[] Pass(params IArchiveEntry[] entries)
+        {
+            var cueentry = entries.FirstOrDefault(et => et.Key.EndsWith(".cue"));
+            if(cueentry != null) return new string[] { cueentry.Key };
+            else return null;
         }
     }
 }
