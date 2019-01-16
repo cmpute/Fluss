@@ -21,7 +21,7 @@ namespace JacobZ.Fluss.Win.Views
     public partial class FileConversion : Page
     {
         MainWindow _owner;
-        bool _ctrl_pressed;
+        bool _ctrl_pressed = false;
 
         public FileConversion(MainWindow owner)
         {
@@ -50,6 +50,8 @@ namespace JacobZ.Fluss.Win.Views
                     Kind = OperationTargetKind.Input
                 });
         }
+
+        #region Property and List change events
 
         private ObservableCollection<OperationTarget> SourceList
         {
@@ -164,6 +166,8 @@ namespace JacobZ.Fluss.Win.Views
                 OutputPath.Text = string.Empty;
             }
         }
+
+        #endregion
 
         private void BatchWhenAdd_PropertyChanged(DependencyObject dp, DependencyPropertyChangedEventArgs e)
         {
@@ -280,6 +284,32 @@ namespace JacobZ.Fluss.Win.Views
         {
             if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
                 _ctrl_pressed = false;
+        }
+
+        private void OperationTarget_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            var target = (sender as ListViewItem).DataContext as OperationTarget;
+            System.Diagnostics.Debug.WriteLine("Double-clicked on " + target.FilePath);
+
+            // TODO: toggle operation editing
+        }
+
+        private void OperationTarget_MouseEnter(object sender, MouseEventArgs e)
+        {
+            var target = (sender as ListViewItem).DataContext as OperationTarget;
+            foreach(var prior in _owner.OperationQueue.GetPriorTargets(target))
+                prior.HighlightInput = true;
+            foreach (var post in _owner.OperationQueue.GetPosteriorTargets(target))
+                post.HighlightOutput = true;
+        }
+
+        private void OperationTarget_MouseLeave(object sender, MouseEventArgs e)
+        {
+            var target = (sender as ListViewItem).DataContext as OperationTarget;
+            foreach (var prior in _owner.OperationQueue.GetPriorTargets(target))
+                prior.HighlightInput = false;
+            foreach (var post in _owner.OperationQueue.GetPosteriorTargets(target))
+                post.HighlightOutput = false;
         }
     }
 }

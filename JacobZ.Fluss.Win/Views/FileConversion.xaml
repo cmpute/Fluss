@@ -23,11 +23,40 @@
             <ListView x:Name="OriginFileView" Margin="4,8"
                       ItemsSource="{Binding SourceList}" DisplayMemberPath="FilePath"
                       SelectionChanged="OriginFileView_SelectionChanged">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <EventSetter Event="MouseEnter" Handler="OperationTarget_MouseEnter"/>
+                        <EventSetter Event="MouseLeave" Handler="OperationTarget_MouseLeave"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HighlightInput}" Value="True">
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Background" Value="#FF120E61" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListView.ItemContainerStyle>
             </ListView>
             <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch"/>
             <ListView x:Name="MiddleFileView" Margin="4,8" Grid.Row="2"
                       ItemsSource="{Binding MiddleList}" DisplayMemberPath="FilePath"
                       SelectionChanged="MiddleFileView_SelectionChanged">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <EventSetter Event="MouseDoubleClick" Handler="OperationTarget_MouseDoubleClick"/>
+                        <EventSetter Event="MouseEnter" Handler="OperationTarget_MouseEnter"/>
+                        <EventSetter Event="MouseLeave" Handler="OperationTarget_MouseLeave"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HighlightInput}" Value="True">
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Background" Value="#FF120E61" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding HighlightOutput}" Value="True">
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Background" Value="#FF0E613F" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListView.ItemContainerStyle>
             </ListView>
         </Grid>
         <GridSplitter ResizeDirection="Columns" VerticalAlignment="Stretch" Grid.Column="1" HorizontalAlignment="Stretch"/>
@@ -39,6 +68,23 @@
             <ListView x:Name="ConvertedFileView" Margin="4,8"
                       ItemsSource="{Binding OutputList}" DisplayMemberPath="FilePath"
                       SelectionChanged="ConvertedFileView_SelectionChanged">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <EventSetter Event="MouseDoubleClick" Handler="OperationTarget_MouseDoubleClick"/>
+                        <EventSetter Event="MouseEnter" Handler="OperationTarget_MouseEnter"/>
+                        <EventSetter Event="MouseLeave" Handler="OperationTarget_MouseLeave"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HighlightInput}" Value="True">
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Background" Value="#FF120E61" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding HighlightOutput}" Value="True">
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Background" Value="#FF0E613F" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListView.ItemContainerStyle>
             </ListView>
             <Grid Grid.Row="1">
                 <Grid.RowDefinitions>

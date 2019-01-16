@@ -44,7 +44,7 @@ namespace JacobZ.Fluss.Win.Utils
                     yield return op;
         }
 
-        private IEnumerable<OperationTarget> GetPriorTargets(OperationTarget target)
+        public IEnumerable<OperationTarget> GetPriorTargets(OperationTarget target)
         {
             foreach (var op in GetPriorOperations(target))
                 foreach (var pri in op.Inputs)
@@ -56,7 +56,7 @@ namespace JacobZ.Fluss.Win.Utils
                 if (op.Inputs.Contains(target))
                     yield return op;
         }
-        private IEnumerable<OperationTarget> GetPosteriorTargets(OperationTarget target)
+        public IEnumerable<OperationTarget> GetPosteriorTargets(OperationTarget target)
         {
             foreach (var op in GetPosteriorOperations(target))
                 foreach (var post in op.Outputs)

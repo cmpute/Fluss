@@ -48,6 +48,30 @@ namespace JacobZ.Fluss.Win.Models
             }
         }
 
+        bool _is_input_hl = false, _is_output_hl = false;
+        public bool HighlightInput
+        {
+            get { return _is_input_hl; }
+            set
+            {
+                if (_is_input_hl == value)
+                    return;
+                _is_input_hl = value;
+                OnPropertyChanged();
+            }
+        }
+        public bool HighlightOutput
+        {
+            get { return _is_output_hl; }
+            set
+            {
+                if (_is_output_hl == value)
+                    return;
+                _is_output_hl = value;
+                OnPropertyChanged();
+            }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
         void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
