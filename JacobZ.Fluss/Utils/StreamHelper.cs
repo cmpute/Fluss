@@ -9,6 +9,12 @@ namespace JacobZ.Fluss.Utils
 {
     static class StreamHelper
     {
+        public static void EnsureFilePath(params string[] paths)
+        {
+            foreach(var file in paths)
+                Directory.CreateDirectory(Path.GetDirectoryName(file));
+        }
+
         private static byte[] ReadBytesR(BinaryReader reader, int count, bool reverse)
         {
             byte[] data = reader.ReadBytes(count);

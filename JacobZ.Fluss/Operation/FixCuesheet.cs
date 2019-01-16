@@ -4,6 +4,7 @@ using System.Text;
 using System.Linq;
 using System.IO;
 using SharpCompress.Archives;
+using JacobZ.Fluss.Utils;
 
 namespace JacobZ.Fluss.Operation
 {
@@ -11,6 +12,7 @@ namespace JacobZ.Fluss.Operation
     {
         public void Execute(IArchiveEntry[] entries, params string[] outputPath)
         {
+            StreamHelper.EnsureFilePath(outputPath);
             var cueentry = entries.First(et => et.Key.EndsWith(".cue"));
             var encoding = FixEncoding.DetectEncoding(cueentry);
             var stream = cueentry.OpenEntryStream();

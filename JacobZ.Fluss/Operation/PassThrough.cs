@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using SharpCompress.Archives;
+using JacobZ.Fluss.Utils;
 
 namespace JacobZ.Fluss.Operation
 {
@@ -10,6 +11,7 @@ namespace JacobZ.Fluss.Operation
     {
         public void Execute(IArchiveEntry[] entryIndices, params string[] outputPath)
         {
+            StreamHelper.EnsureFilePath(outputPath);
             using (var fin = entryIndices[0].OpenEntryStream())
             using (var fout = File.OpenWrite(outputPath[0]))
                 fin.CopyTo(fout);

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using JacobZ.Fluss.Utils;
 using SharpCompress.Archives;
 
 namespace JacobZ.Fluss.Win.Models
@@ -14,15 +15,36 @@ namespace JacobZ.Fluss.Win.Models
         }
 
         public OperationTargetKind Kind { get; set; }
+
         IArchiveEntry _entry;
+        // Return source entry for source target, or dummy entry for generated target
         public IArchiveEntry Entry
         {
-            get { return _entry; }
+            get
+            {
+                return Kind == OperationTargetKind.Input ? _entry : new DirectoryArchiveEntry(FilePath);
+            }
             set
             {
                 if (_entry == value)
                     return;
-                _entry = value; OnPropertyChanged();
+                _entry = value;
+                FilePath = Entry.Key;
+                OnPropertyChanged();
+            }
+        }
+
+        string _filepath = string.Empty;
+        // Return source key for source target, or custom name for generated target
+        public string FilePath
+        {
+            get { return Kind == OperationTargetKind.Input ? _entry.Key : _filepath; }
+            set
+            {
+                if (_filepath == value)
+                    return;
+                _filepath = value;
+                OnPropertyChanged();
             }
         }
 

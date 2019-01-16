@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using JacobZ.Fluss.Utils;
 using SharpCompress.Archives;
 using Ude;
 
@@ -62,6 +63,7 @@ namespace JacobZ.Fluss.Operation
 
         public void Execute(IArchiveEntry[] entries, params string[] outputPath)
         {
+            StreamHelper.EnsureFilePath(outputPath);
             var entry = entries[0];
             var encoding = DetectEncoding(entry);
             var stream = entry.OpenEntryStream();

@@ -10,6 +10,8 @@ namespace JacobZ.Fluss.Win.Utils
 {
     static class ProgramFinder
     {
+        public static readonly string TempPath = Path.Combine(Path.GetTempPath(), "fluss");
+
         public static void FindWavpack()
         {
             if (WavPack.WavPackPath == null)

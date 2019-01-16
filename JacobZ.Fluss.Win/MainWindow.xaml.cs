@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -72,6 +73,27 @@ namespace JacobZ.Fluss.Win
             if (result != CommonFileDialogResult.Ok) return;
 
             OutputPath.Text = dialog.FileName;
+        }
+
+        private void Generate_Click(object sender, RoutedEventArgs e)
+        {
+            List<OperationTarget> clear = new List<OperationTarget>();
+            var result = OperationQueue.Sort();
+
+            foreach (var op in OperationQueue.Sort())
+            {
+                op.Operation.Execute(op.Inputs.Select(entry =>
+                        entry.Kind == OperationTargetKind.Input ? entry.Entry :
+                            new DirectoryArchiveEntry(Path.Combine(ProgramFinder.TempPath, entry.FilePath), new DirectoryInfo(ProgramFinder.TempPath))).ToArray(),
+                    op.Outputs.Select(entry =>
+                        Path.Combine(entry.Kind == OperationTargetKind.Output ? OutputPath.Text : 
+                            ProgramFinder.TempPath, entry.FilePath)).ToArray());
+                clear.AddRange(op.Outputs.Where(entry => entry.Kind == OperationTargetKind.Temporary));
+            }
+            foreach (var target in clear.Distinct())
+                File.Delete(Path.Combine(ProgramFinder.TempPath + target.FilePath));
+
+            MessageBox.Show("Conversion completed!");
         }
 
         #region State Variables

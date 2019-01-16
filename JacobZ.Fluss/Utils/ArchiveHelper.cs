@@ -41,6 +41,13 @@ namespace JacobZ.Fluss.Utils
         internal FileInfo File { get; set; }
         internal DirectoryInfo Root { get; set; }
 
+        // Construct dummy
+        public DirectoryArchiveEntry(string file)
+        {
+            File = new FileInfo(file);
+            Root = null;
+        }
+
         public DirectoryArchiveEntry(string file, DirectoryInfo root)
         {
             File = new FileInfo(file);
@@ -60,12 +67,12 @@ namespace JacobZ.Fluss.Utils
         public DateTime? LastAccessedTime => File.LastAccessTime;
         public DateTime? LastModifiedTime => null;
         public long Size => File.Length;
-        public string Key => File.FullName.Substring(Root.FullName.Length);
+        public string Key => Root == null ? File.Name : File.FullName.Substring(Root.FullName.Length);
         #endregion
 
         #region IArchiveEntry
         public bool IsComplete => true;
-        public IArchive Archive => new DirectoryArchive(Root.FullName);
+        public IArchive Archive => Root == null ? null : new DirectoryArchive(Root.FullName);
         public Stream OpenEntryStream() => File.Open(FileMode.Open);
         #endregion
     }

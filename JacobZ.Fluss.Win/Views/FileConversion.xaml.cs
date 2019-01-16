@@ -8,8 +8,10 @@ using System.Linq;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using SharpCompress.Common;
 using SharpCompress.Archives;
+using JacobZ.Fluss.Win.Utils;
 
 namespace JacobZ.Fluss.Win.Views
 {
@@ -18,9 +20,8 @@ namespace JacobZ.Fluss.Win.Views
     /// </summary>
     public partial class FileConversion : Page
     {
-        static readonly string TempPath = Path.GetTempPath() + "/fluss";
-
         MainWindow _owner;
+        bool _ctrl_pressed;
 
         public FileConversion(MainWindow owner)
         {
@@ -92,7 +93,13 @@ namespace JacobZ.Fluss.Win.Views
                 SourceSelected.Remove(item as OperationTarget);
             foreach (var item in e.AddedItems)
                 SourceSelected.Add(item as OperationTarget);
+
             RefreshButtonState();
+            if(!_ctrl_pressed && e.AddedItems.Count > 0)
+            {
+                MiddleFileView.SelectedItems.Clear();
+                ConvertedFileView.SelectedItems.Clear();
+            }
         }
 
         private void MiddleFileView_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -107,7 +114,13 @@ namespace JacobZ.Fluss.Win.Views
                 SourceSelected.Add(item as OperationTarget);
                 OutputSelected.Add(item as OperationTarget);
             }
+
             RefreshButtonState();
+            if (!_ctrl_pressed && e.AddedItems.Count > 0)
+            {
+                OriginFileView.SelectedItems.Clear();
+                ConvertedFileView.SelectedItems.Clear();
+            }
         }
 
         private void ConvertedFileView_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -116,7 +129,13 @@ namespace JacobZ.Fluss.Win.Views
                 OutputSelected.Remove(item as OperationTarget);
             foreach (var item in e.AddedItems)
                 OutputSelected.Add(item as OperationTarget);
+
             RefreshButtonState();
+            if (!_ctrl_pressed && e.AddedItems.Count > 0)
+            {
+                OriginFileView.SelectedItems.Clear();
+                MiddleFileView.SelectedItems.Clear();
+            }
         }
 
         private void PossibleOps_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -129,7 +148,7 @@ namespace JacobZ.Fluss.Win.Views
             if (SourceSelected.Count > 0)
                 PossibleOps.ItemsSource = OperationFactory.EntryOperationTypes.Where(
                     op => OperationFactory.CheckOperation(op, SourceSelected.Select(target => target.Entry).ToArray()));
-            else PossibleOps.ItemsSource = null;
+            else PossibleOps.ItemsSource = Enumerable.Empty<Type>();
         }
 
         private void OutputSelected_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -137,7 +156,7 @@ namespace JacobZ.Fluss.Win.Views
             if (OutputSelected.Count == 1)
             {
                 OutputPath.IsEnabled = true;
-                OutputPath.Text = OutputSelected[0].Entry.Key;
+                OutputPath.Text = OutputSelected[0].FilePath;
             }
             else
             {
@@ -179,13 +198,13 @@ namespace JacobZ.Fluss.Win.Views
                     var output_pred = operation.Pass(new IArchiveEntry[] { item.Entry });
                     var output_list = output_pred.Select(path => new OperationTarget()
                     {
-                        Entry = new DirectoryArchiveEntry(TempPath + path, new DirectoryInfo(TempPath)),
+                        FilePath = path,
                         Kind = OperationTargetKind.Temporary
-                    });
+                    }).ToArray();
                     _owner.OperationQueue.AddOperation(new OperationDelegate()
                     {
                         Inputs = new OperationTarget[] { item },
-                        Outputs = output_list.ToArray(),
+                        Outputs = output_list,
                         Operation = operation
                     });
                     foreach(var output in output_list)
@@ -197,7 +216,7 @@ namespace JacobZ.Fluss.Win.Views
                 var output_pred = operation.Pass(SourceSelected.Select(item => item.Entry).ToArray());
                 var output_list = output_pred.Select(path => new OperationTarget()
                 {
-                    Entry = new DirectoryArchiveEntry(TempPath + path, new DirectoryInfo(TempPath)),
+                    FilePath = path,
                     Kind = OperationTargetKind.Temporary
                 }).ToArray();
                 _owner.OperationQueue.AddOperation(new OperationDelegate()
@@ -211,9 +230,9 @@ namespace JacobZ.Fluss.Win.Views
             }
         }
 
-        private void OutputPath_LostKeyboardFocus(object sender, System.Windows.Input.KeyboardFocusChangedEventArgs e)
+        private void OutputPath_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
-            OutputSelected[0].Entry = new DirectoryArchiveEntry(TempPath + OutputPath.Text, new DirectoryInfo(TempPath));
+            OutputSelected[0].FilePath = OutputPath.Text;
         }
 
         private void RemoveOutput_Click(object sender, RoutedEventArgs e)
@@ -249,6 +268,18 @@ namespace JacobZ.Fluss.Win.Views
                 MiddleList.Remove(remove);
                 OutputList.Remove(remove);
             }
+        }
+
+        private void Page_KeyDown(object sender, KeyEventArgs e)
+        {
+            if(e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+                _ctrl_pressed = true;
+        }
+
+        private void Page_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+                _ctrl_pressed = false;
         }
     }
 }

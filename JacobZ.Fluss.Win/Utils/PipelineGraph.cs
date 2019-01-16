@@ -9,11 +9,11 @@ namespace JacobZ.Fluss.Win.Utils
 {
     public class PipelineGraph
     {
-        List<OperationDelegate> _operations = new List<OperationDelegate>();
+        List<OperationDelegate> Operations { get; } = new List<OperationDelegate>();
 
         public void AddOperation(OperationDelegate operation)
         {
-            _operations.Add(operation);
+            Operations.Add(operation);
         }
 
         // return all targets to be removed
@@ -27,7 +27,7 @@ namespace JacobZ.Fluss.Win.Utils
                     foreach (var posttarget in RemoveOperation(postop))
                         retval.Add(target);
             }
-            _operations.Remove(operation);
+            Operations.Remove(operation);
             return retval;
         }
 
@@ -39,7 +39,7 @@ namespace JacobZ.Fluss.Win.Utils
         
         public IEnumerable<OperationDelegate> GetPriorOperations(OperationTarget target)
         {
-            foreach (var op in _operations)
+            foreach (var op in Operations)
                 if (op.Outputs.Contains(target))
                     yield return op;
         }
@@ -52,7 +52,7 @@ namespace JacobZ.Fluss.Win.Utils
         }
         public IEnumerable<OperationDelegate> GetPosteriorOperations(OperationTarget target)
         {
-            foreach (var op in _operations)
+            foreach (var op in Operations)
                 if (op.Inputs.Contains(target))
                     yield return op;
         }
@@ -63,6 +63,31 @@ namespace JacobZ.Fluss.Win.Utils
                     yield return post;
         }
 
-        public IList<OperationTarget> Sort() { throw new NotImplementedException(); }
+        public IList<OperationDelegate> Sort()
+        {
+            HashSet<OperationDelegate> candidate = new HashSet<OperationDelegate>(Operations);
+            List<OperationDelegate> result = new List<OperationDelegate>();
+            foreach (var op in candidate)
+                if (op.Inputs.All(target => target.Kind == OperationTargetKind.Input))
+                    result.AddRange(SortAt(op, candidate));
+
+            result.Reverse();
+            return result;
+        }
+
+        private IEnumerable<OperationDelegate> SortAt(OperationDelegate root, HashSet<OperationDelegate> mark)
+        {
+            foreach(var target in root.Outputs.Where(target => target.Kind != OperationTargetKind.Output))
+                foreach(var postop in GetPosteriorOperations(target))
+                {
+                    if (mark.Contains(postop))
+                        continue;
+                    foreach (var result in SortAt(root, mark))
+                        yield return result;
+                }
+
+            mark.Add(root);
+            yield return root;
+        }
     }
 }

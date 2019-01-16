@@ -61,7 +61,8 @@
                          Margin="4" Grid.Column="1" VerticalContentAlignment="Center"/>
                 <Button x:Name="BrowseOutput" Click="BrowseOutput_Click"
                         Margin="4" Grid.Column="2" Width="40" Content="浏览"/>
-                <Button Margin="4" Grid.Column="3" Width="40" Content="生成"/>
+                <Button x:Name="Generate" Click="Generate_Click"
+                        Margin="4" Grid.Column="3" Width="40" Content="生成"/>
             </Grid>
         </StackPanel>
 

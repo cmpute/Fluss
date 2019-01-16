@@ -7,7 +7,7 @@
       xmlns:model="clr-namespace:JacobZ.Fluss.Win.Models"
       mc:Ignorable="d" 
       d:DesignHeight="450" d:DesignWidth="800"
-      Title="FileConversion">
+      Title="FileConversion" KeyDown="Page_KeyDown" KeyUp="Page_KeyUp">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="2*"/>
@@ -21,12 +21,12 @@
                 <RowDefinition/>
             </Grid.RowDefinitions>
             <ListView x:Name="OriginFileView" Margin="4,8"
-                      ItemsSource="{Binding SourceList}" DisplayMemberPath="Entry.Key"
+                      ItemsSource="{Binding SourceList}" DisplayMemberPath="FilePath"
                       SelectionChanged="OriginFileView_SelectionChanged">
             </ListView>
             <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch"/>
             <ListView x:Name="MiddleFileView" Margin="4,8" Grid.Row="2"
-                      ItemsSource="{Binding MiddleList}" DisplayMemberPath="Entry.Key"
+                      ItemsSource="{Binding MiddleList}" DisplayMemberPath="FilePath"
                       SelectionChanged="MiddleFileView_SelectionChanged">
             </ListView>
         </Grid>
@@ -37,14 +37,8 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <ListView x:Name="ConvertedFileView" Margin="4,8"
-                      ItemsSource="{Binding OutputList}"
+                      ItemsSource="{Binding OutputList}" DisplayMemberPath="FilePath"
                       SelectionChanged="ConvertedFileView_SelectionChanged">
-                <ListView.View>
-                    <GridView>
-                        <GridViewColumn Width="200" Header="File Path"
-                                    DisplayMemberBinding="{Binding Entry.Key}"/>
-                    </GridView>
-                </ListView.View>
             </ListView>
             <Grid Grid.Row="1">
                 <Grid.RowDefinitions>
