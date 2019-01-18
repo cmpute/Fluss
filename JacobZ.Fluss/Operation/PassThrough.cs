@@ -24,8 +24,7 @@ namespace JacobZ.Fluss.Operation
         public string[] Pass(params IArchiveEntry[] archiveEntries)
         {
             if (archiveEntries.Length > 1) return null;
-            var entry = archiveEntries[0].Key;
-            return new string[] { Path.GetFileNameWithoutExtension(entry) + ".copy" + Path.GetExtension(entry) };
+            return new string[] { Path.GetFileName(archiveEntries[0].Key) };
         }
     }
 }

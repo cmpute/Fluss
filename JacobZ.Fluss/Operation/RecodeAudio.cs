@@ -13,20 +13,11 @@ namespace JacobZ.Fluss.Operation
     {
         private static readonly string TempPath = Path.Combine(Path.GetTempPath(), "fluss", "audio\\");
 
-        public delegate void FindRequiredCodec(AudioType ext);
-        public static FindRequiredCodec CodecFinder { get; set; }
-
-        public enum AudioType
-        {
-            Wavpack, // .wv
-            TTA, // .tta
-        }
-
         public struct Meta
         {
-            public AudioType Type { get; set; }
+            public CodecType Type { get; set; }
         }
-        Meta _props;
+        Meta _props = new Meta() { Type = CodecType.Wavpack };
         public object Properties { get => _props; set => _props = (Meta)value; }
 
         public void Execute(IArchiveEntry[] entryIndices, params string[] outputPath)
@@ -37,47 +28,27 @@ namespace JacobZ.Fluss.Operation
             string input = Path.Combine(TempPath, Path.GetFileName(entryIndices[0].Key));
             string input2 = null;
 
-            // Select decoder
+            // Select codec
             string fext = Path.GetExtension(entryIndices[0].Key).ToLower();
-            switch (fext)
-            {
-                case ".wv":
-                    decoder = new WavPack();
-                    CodecFinder(AudioType.Wavpack);
-
-                    // Decompress wvc file
-                    string finame = Path.GetFileNameWithoutExtension(entryIndices[0].Key) + ".wvc";
-                    input2 = Path.Combine(TempPath, finame);
-                    var wvcfiles = entryIndices[0].Archive.Entries.Where(entry => Path.GetFileName(entry.Key) == finame).ToArray();
-                    if (wvcfiles.Length > 0)
-                    {
-                        using (var fin = wvcfiles[0].OpenEntryStream())
-                        using (var fout = File.OpenWrite(input2))
-                            fin.CopyTo(fout);
-                    }
-                    break;
-                case ".tta":
-                    decoder = new TTA();
-                    CodecFinder(AudioType.TTA);
-                    break;
-            }
+            CodecType tdec = CodecFactory.ParseCodec(fext);
+            decoder = CodecFactory.GetCodec(tdec);
+            encoder = CodecFactory.GetCodec(_props.Type);
 
             // Decompress audio file
             using (var fin = entryIndices[0].OpenEntryStream())
             using (var fout = File.OpenWrite(input))
                 fin.CopyTo(fout);
-
-            // Select encoder
-            switch (_props.Type)
+            if (tdec == CodecType.Wavpack)
             {
-                case AudioType.Wavpack:
-                    encoder = new WavPack();
-                    CodecFinder(AudioType.Wavpack);
-                    break;
-                case AudioType.TTA:
-                    decoder = new TTA();
-                    CodecFinder(AudioType.TTA);
-                    break;
+                string finame = Path.GetFileNameWithoutExtension(entryIndices[0].Key) + ".wvc";
+                input2 = Path.Combine(TempPath, finame);
+                var wvcfiles = entryIndices[0].Archive.Entries.Where(entry => Path.GetFileName(entry.Key) == finame).ToArray();
+                if (wvcfiles.Length > 0)
+                {
+                    using (var fin = wvcfiles[0].OpenEntryStream())
+                    using (var fout = File.OpenWrite(input2))
+                        fin.CopyTo(fout);
+                }
             }
 
             // Recode
@@ -86,7 +57,23 @@ namespace JacobZ.Fluss.Operation
 
             // Clear temp files
             File.Delete(input);
-            if (input2 != null) File.Delete(input2);
+            if (input2 != null) File.Delete(input2); // delete input wvc file
+            if (_props.Type == CodecType.Wavpack && outputPath.Length > 1) // move output wvc file
+            {
+                string fwv, fwvc;
+                if(Path.GetExtension(outputPath[0]) == ".wv")
+                {
+                    fwv = outputPath[0];
+                    fwvc = outputPath[1];
+                }
+                else
+                {
+                    fwvc = outputPath[0];
+                    fwv = outputPath[1];
+                }
+                if (Path.GetDirectoryName(fwvc) != Path.GetDirectoryName(fwv))
+                    File.Move(fwv + "c", fwvc);
+            }
         }
 
         public string[] Pass(params IArchiveEntry[] archiveEntries)
@@ -97,18 +84,13 @@ namespace JacobZ.Fluss.Operation
             var oname = Path.GetFileName(fname);
 
             // Check input
-            switch (fext)
-            {
-                default: return null;
-                case ".wv":
-                case ".tta":
-                    break;
-            }
+            var tdec = CodecFactory.ParseCodec(fext);
+            if (tdec == CodecType.Unknown) return null;
 
             // Generate output
             switch (_props.Type)
             {
-                case AudioType.Wavpack:
+                case CodecType.Wavpack:
                     return new string[] { oname + ".wv", oname + ".wvc" };
             }
             return null;

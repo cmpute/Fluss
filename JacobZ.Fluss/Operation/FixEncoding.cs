@@ -81,10 +81,10 @@ namespace JacobZ.Fluss.Operation
         readonly string[] SupportText = new string[] { ".log", ".txt", ".cue" };
         public string[] Pass(params IArchiveEntry[] entries)
         {
-            if (entries.Count() > 0) return null;
+            if (entries.Count() > 1) return null;
             var entry = entries[0];
             var ext = Path.GetExtension(entry.Key);
-            if (SupportText.Contains(ext)) return new string[] { entry.Key };
+            if (SupportText.Contains(ext)) return new string[] { Path.GetFileName(entry.Key) };
             else return null;
         }
     }

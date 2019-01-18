@@ -39,7 +39,7 @@ namespace JacobZ.Fluss.Win.Views
             OutputSelected.CollectionChanged += OutputSelected_CollectionChanged;
 
             // Using program finder
-            Operation.RecodeAudio.CodecFinder = ProgramFinder.FindCoder;
+            Audio.CodecFactory.CodecFinder = ProgramFinder.FindCodec;
         }
 
         static FileConversion _instance;
@@ -55,13 +55,14 @@ namespace JacobZ.Fluss.Win.Views
                     Kind = OperationTargetKind.Input
                 });
         }
-        
+
         Dictionary<Type, string> OperationNames => new Dictionary<Type, string>
         {
             { typeof(PassThrough), nameof(PassThrough) },
             { typeof(FixCuesheet), nameof(FixCuesheet) },
             { typeof(FixEncoding), nameof(FixEncoding) },
-            { typeof(RecodeAudio), nameof(RecodeAudio) }
+            { typeof(RecodeAudio), nameof(RecodeAudio) },
+            { typeof(EmbedCuesheet), nameof(EmbedCuesheet) }
         };
         private Tuple<IArchiveEntryOperation, string> GetOperationTuple(IArchiveEntryOperation op)
         {
@@ -215,16 +216,16 @@ namespace JacobZ.Fluss.Win.Views
             if (SourceSelected.Count > 0)
                 if (BatchWhenAdd)
                 {
-                    PossibleOps.ItemsSource = OperationFactory.EntryOperationTypes
-                        .Where(op => OperationFactory.CheckOperation(op, SourceSelected.Select(target => target.Entry).ToArray()))
-                        .Select(type => GetOperationTuple(OperationFactory.NewOperation(type))).ToList();
-                }
-                else
-                {
                     PossibleOps.ItemsSource = SourceSelected
                         .Select(target => OperationFactory.EntryOperationTypes
                             .Where(op => OperationFactory.CheckOperation(op, new[] { target.Entry })))
                         .Aggregate((p, n) => p.Intersect(n))
+                        .Select(type => GetOperationTuple(OperationFactory.NewOperation(type))).ToList();
+                }
+                else
+                {
+                    PossibleOps.ItemsSource = OperationFactory.EntryOperationTypes
+                        .Where(op => OperationFactory.CheckOperation(op, SourceSelected.Select(target => target.Entry).ToArray()))
                         .Select(type => GetOperationTuple(OperationFactory.NewOperation(type))).ToList();
                 }
             else PossibleOps.ItemsSource = Enumerable.Empty<Tuple<IArchiveEntryOperation, string>>();

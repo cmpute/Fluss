@@ -17,7 +17,7 @@ namespace JacobZ.Fluss.Utils
             _dir = new DirectoryInfo(directory);
         }
 
-        public IEnumerable<IArchiveEntry> Entries => Directory.EnumerateFiles(_dir.FullName)
+        public IEnumerable<IArchiveEntry> Entries => Directory.EnumerateFiles(_dir.FullName, "*", SearchOption.AllDirectories)
             .Select(file => new DirectoryArchiveEntry(file, _dir));
 
         public IEnumerable<IVolume> Volumes => null;

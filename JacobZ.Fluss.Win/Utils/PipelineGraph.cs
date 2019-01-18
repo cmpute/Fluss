@@ -69,9 +69,9 @@ namespace JacobZ.Fluss.Win.Utils
 
         public IList<OperationDelegate> Sort()
         {
-            HashSet<OperationDelegate> candidate = new HashSet<OperationDelegate>(Operations);
+            HashSet<OperationDelegate> candidate = new HashSet<OperationDelegate>();
             List<OperationDelegate> result = new List<OperationDelegate>();
-            foreach (var op in candidate)
+            foreach (var op in Operations)
                 if (op.Inputs.All(target => target.Kind == OperationTargetKind.Input))
                     result.AddRange(SortAt(op, candidate));
 
@@ -81,12 +81,12 @@ namespace JacobZ.Fluss.Win.Utils
 
         private IEnumerable<OperationDelegate> SortAt(OperationDelegate root, HashSet<OperationDelegate> mark)
         {
-            foreach(var target in root.Outputs.Where(target => target.Kind != OperationTargetKind.Output))
+            foreach(var target in root.Outputs)
                 foreach(var postop in GetPosteriorOperations(target))
                 {
                     if (mark.Contains(postop))
                         continue;
-                    foreach (var result in SortAt(root, mark))
+                    foreach (var result in SortAt(postop, mark))
                         yield return result;
                 }
 

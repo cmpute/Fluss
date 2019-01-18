@@ -21,7 +21,7 @@ namespace JacobZ.Fluss.Operation
         /// <param name="archive">Music archive input</param>
         /// <param name="entryIndices">Indices for selected archive entries</param>
         /// <param name="outputPath">Paths for output files</param>
-        void Execute(IArchiveEntry[] entryIndices, params string[] outputPath);
+        void Execute(IArchiveEntry[] archiveEntries, params string[] outputPath);
 
         /// <summary>
         /// Access the properties of the operation

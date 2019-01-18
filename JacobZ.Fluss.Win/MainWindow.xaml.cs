@@ -77,6 +77,12 @@ namespace JacobZ.Fluss.Win
 
         private void Generate_Click(object sender, RoutedEventArgs e)
         {
+            if (string.IsNullOrWhiteSpace(OutputPath.Text))
+            {
+                MessageBox.Show("Please select output path"); // TODO: Change to WPF style using TaskDialog
+                return;
+            }
+
             List<OperationTarget> clear = new List<OperationTarget>();
             var result = OperationQueue.Sort();
 
@@ -90,9 +96,10 @@ namespace JacobZ.Fluss.Win
                             ProgramFinder.TempPath, entry.FilePath)).ToArray());
                 clear.AddRange(op.Outputs.Where(entry => entry.Kind == OperationTargetKind.Temporary));
             }
-            foreach (var target in clear.Distinct())
-                File.Delete(Path.Combine(ProgramFinder.TempPath + target.FilePath));
 
+            // Clear temp files
+            foreach (var target in clear.Distinct())
+                File.Delete(Path.Combine(ProgramFinder.TempPath, target.FilePath));
             MessageBox.Show("Conversion completed!");
         }
 
@@ -105,7 +112,7 @@ namespace JacobZ.Fluss.Win
             // Update archive object
             IArchive archive;
             var ext = Path.GetExtension(RootPath.Text);
-            if (ext.Length == 0)
+            if (Directory.Exists(RootPath.Text))
                 archive = new DirectoryArchive(RootPath.Text);
             else
             {
@@ -124,6 +131,7 @@ namespace JacobZ.Fluss.Win
             Archive = new MusicArchive(archive, RootPath.Text);
 
             // Clear archive operations
+            // TODO: clear temporary operation targets
             OperationQueue = new PipelineGraph();
 
             // Notify pages

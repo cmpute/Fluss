@@ -13,17 +13,15 @@ namespace JacobZ.Fluss.Win.Utils
     {
         public static readonly string TempPath = Path.Combine(Path.GetTempPath(), "fluss");
 
-        public static void FindCoder(RecodeAudio.AudioType ext)
+        public static void FindCodec(CodecType ext)
         {
-            switch(ext)
+            switch (ext)
             {
-                case RecodeAudio.AudioType.Wavpack:
-                    if (WavPack.WavPackPath == null)
-                        WavPack.WavPackPath = SearchForExe("wavpack");
+                case CodecType.Wavpack:
+                    WavPack.WavPackPath = SearchForExe("wavpack");
                     break;
-                case RecodeAudio.AudioType.TTA:
-                    if (TTA.TTAPath == null)
-                        TTA.TTAPath = SearchForExe("tta");
+                case CodecType.TTA:
+                    TTA.TTAPath = SearchForExe("tta");
                     break;
             }
         }
