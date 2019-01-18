@@ -33,21 +33,25 @@ namespace JacobZ.Fluss.Win.Utils
 
         public IEnumerable<OperationTarget> RemoveTarget(OperationTarget target)
         {
-            var list = GetPriorOperations(target).ToArray(); // prevent modifying enumerator
-            return list.SelectMany(op => RemoveOperation(op)).Distinct();
+            var priorop = GetPriorOperation(target);
+            if (priorop != null) return RemoveOperation(priorop);
+            else return Enumerable.Empty<OperationTarget>();
         }
-        
-        public IEnumerable<OperationDelegate> GetPriorOperations(OperationTarget target)
+
+        // Each target only have one prior operation which generates this target
+        public OperationDelegate GetPriorOperation(OperationTarget target)
         {
             foreach (var op in Operations)
                 if (op.Outputs.Contains(target))
-                    yield return op;
+                    return op;
+            return null;
         }
 
         public IEnumerable<OperationTarget> GetPriorTargets(OperationTarget target)
         {
-            foreach (var op in GetPriorOperations(target))
-                foreach (var pri in op.Inputs)
+            var priorop = GetPriorOperation(target);
+            if(priorop != null)
+                foreach (var pri in priorop.Inputs)
                     yield return pri;
         }
         public IEnumerable<OperationDelegate> GetPosteriorOperations(OperationTarget target)

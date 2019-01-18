@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading.Tasks;
 using JacobZ.Fluss.Audio;
 using Microsoft.Win32;
+using JacobZ.Fluss.Operation;
 
 namespace JacobZ.Fluss.Win.Utils
 {
@@ -12,16 +13,19 @@ namespace JacobZ.Fluss.Win.Utils
     {
         public static readonly string TempPath = Path.Combine(Path.GetTempPath(), "fluss");
 
-        public static void FindWavpack()
+        public static void FindCoder(RecodeAudio.AudioType ext)
         {
-            if (WavPack.WavPackPath == null)
-                WavPack.WavPackPath = SearchForExe("wavpack");
-        }
-
-        public static void FindTTA()
-        {
-            if (TTA.TTAPath == null)
-                TTA.TTAPath = SearchForExe("tta");
+            switch(ext)
+            {
+                case RecodeAudio.AudioType.Wavpack:
+                    if (WavPack.WavPackPath == null)
+                        WavPack.WavPackPath = SearchForExe("wavpack");
+                    break;
+                case RecodeAudio.AudioType.TTA:
+                    if (TTA.TTAPath == null)
+                        TTA.TTAPath = SearchForExe("tta");
+                    break;
+            }
         }
 
         internal static string SearchForExe(string name, params string[] additionalPaths)
@@ -30,9 +34,10 @@ namespace JacobZ.Fluss.Win.Utils
 
             // search for PATH
             foreach (var path in Environment.GetEnvironmentVariable("PATH").Split(';'))
-                foreach (var file in Directory.GetFiles(path))
-                    if (Path.GetFileName(file).ToLower() == exeName)
-                        return file;
+                    if(Directory.Exists(path))
+                    foreach (var file in Directory.GetFiles(path))
+                        if (Path.GetFileName(file).ToLower() == exeName)
+                            return file;
 
             // search for current dir
             foreach (var file in Directory.GetFiles(Environment.CurrentDirectory))

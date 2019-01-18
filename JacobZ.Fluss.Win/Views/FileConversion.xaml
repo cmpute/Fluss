@@ -119,8 +119,8 @@
                     <TextBlock VerticalAlignment="Center">操作：</TextBlock>
                     <ComboBox Grid.Column="1" x:Name="PossibleOps" Margin="2,0"
                           SelectionChanged="PossibleOps_SelectionChanged"
-                          DisplayMemberPath="Name"/>
-                    <Button x:Name="OpOptions" Grid.Column="2" Width="40" Height="28" Margin="2,0" IsEnabled="False">选项</Button>
+                          SelectedValuePath="Item1" DisplayMemberPath="Item2"/>
+                    <Button x:Name="OpOptions" Click="OpOptions_Click" Grid.Column="2" Width="40" Height="28" Margin="2,0" IsEnabled="False">选项</Button>
                     <Button x:Name="AddOp" Click="AddOp_Click" Grid.Column="3" Height="28" Width="64" Margin="2,0" IsEnabled="False">添加处理</Button>
                     <CheckBox x:Name="BatchAdd" Grid.Column="4" VerticalAlignment="Center" Margin="2,0" IsChecked="{Binding BatchWhenAdd, Mode=TwoWay}">批量</CheckBox>
                 </Grid>

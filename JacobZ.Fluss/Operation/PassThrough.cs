@@ -7,8 +7,12 @@ using JacobZ.Fluss.Utils;
 
 namespace JacobZ.Fluss.Operation
 {
-    class PassThrough : IArchiveEntryOperation
+    public class PassThrough : IArchiveEntryOperation
     {
+        public struct Meta { }
+        Meta _props;
+        public object Properties { get => _props; set => _props = (Meta)value; }
+
         public void Execute(IArchiveEntry[] entryIndices, params string[] outputPath)
         {
             StreamHelper.EnsureFilePath(outputPath);
@@ -19,6 +23,7 @@ namespace JacobZ.Fluss.Operation
 
         public string[] Pass(params IArchiveEntry[] archiveEntries)
         {
+            if (archiveEntries.Length > 1) return null;
             var entry = archiveEntries[0].Key;
             return new string[] { Path.GetFileNameWithoutExtension(entry) + ".copy" + Path.GetExtension(entry) };
         }

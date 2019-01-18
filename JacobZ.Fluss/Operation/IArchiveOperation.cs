@@ -22,6 +22,11 @@ namespace JacobZ.Fluss.Operation
         /// <param name="entryIndices">Indices for selected archive entries</param>
         /// <param name="outputPath">Paths for output files</param>
         void Execute(IArchiveEntry[] entryIndices, params string[] outputPath);
+
+        /// <summary>
+        /// Access the properties of the operation
+        /// </summary>
+        object Properties { get; set; }
     }
     
     public interface IArchiveOperation

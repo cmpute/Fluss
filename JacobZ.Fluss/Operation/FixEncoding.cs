@@ -61,6 +61,11 @@ namespace JacobZ.Fluss.Operation
             return encoding;
         }
 
+        public struct Meta { }
+
+        Meta _props;
+        public object Properties { get => _props; set => _props = (Meta)value; }
+
         public void Execute(IArchiveEntry[] entries, params string[] outputPath)
         {
             StreamHelper.EnsureFilePath(outputPath);

@@ -10,6 +10,10 @@ namespace JacobZ.Fluss.Operation
 {
     public class FixCuesheet : IArchiveEntryOperation
     {
+        public struct Meta { }
+        Meta _props;
+        public object Properties { get => _props; set => _props = (Meta)value; }
+
         public void Execute(IArchiveEntry[] entries, params string[] outputPath)
         {
             StreamHelper.EnsureFilePath(outputPath);
@@ -56,8 +60,8 @@ namespace JacobZ.Fluss.Operation
 
         public string[] Pass(params IArchiveEntry[] entries)
         {
-            var cueentry = entries.FirstOrDefault(et => et.Key.EndsWith(".cue"));
-            if (cueentry != null) return new string[] { Path.GetFileNameWithoutExtension(cueentry.Key) + ".fix.cue" };
+            var cueentry = entries.Where(et => et.Key.EndsWith(".cue"));
+            if (cueentry.Count() == 1) return new string[] { Path.GetFileNameWithoutExtension(cueentry.First().Key) + ".fix.cue" };
             else return null;
         }
     }

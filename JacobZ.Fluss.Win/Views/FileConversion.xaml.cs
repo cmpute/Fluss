@@ -11,6 +11,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using SharpCompress.Common;
 using SharpCompress.Archives;
+using JacobZ.Fluss.Operation;
 using JacobZ.Fluss.Win.Utils;
 
 namespace JacobZ.Fluss.Win.Views
@@ -22,6 +23,7 @@ namespace JacobZ.Fluss.Win.Views
     {
         MainWindow _owner;
         bool _ctrl_pressed = false;
+        OperationTarget _focus_target = null;
 
         public FileConversion(MainWindow owner)
         {
@@ -35,6 +37,9 @@ namespace JacobZ.Fluss.Win.Views
             OutputSelected = new ObservableCollection<OperationTarget>();
             SourceSelected.CollectionChanged += SourceSelected_CollectionChanged;
             OutputSelected.CollectionChanged += OutputSelected_CollectionChanged;
+
+            // Using program finder
+            Operation.RecodeAudio.CodecFinder = ProgramFinder.FindCoder;
         }
 
         static FileConversion _instance;
@@ -49,6 +54,18 @@ namespace JacobZ.Fluss.Win.Views
                     Entry = item,
                     Kind = OperationTargetKind.Input
                 });
+        }
+        
+        Dictionary<Type, string> OperationNames => new Dictionary<Type, string>
+        {
+            { typeof(PassThrough), nameof(PassThrough) },
+            { typeof(FixCuesheet), nameof(FixCuesheet) },
+            { typeof(FixEncoding), nameof(FixEncoding) },
+            { typeof(RecodeAudio), nameof(RecodeAudio) }
+        };
+        private Tuple<IArchiveEntryOperation, string> GetOperationTuple(IArchiveEntryOperation op)
+        {
+            return new Tuple<IArchiveEntryOperation, string>(op, OperationNames[op.GetType()]);
         }
 
         #region Property and List change events
@@ -97,7 +114,8 @@ namespace JacobZ.Fluss.Win.Views
                 SourceSelected.Add(item as OperationTarget);
 
             RefreshButtonState();
-            if(!_ctrl_pressed && e.AddedItems.Count > 0)
+            _focus_target = null;
+            if (!_ctrl_pressed && e.AddedItems.Count > 0)
             {
                 MiddleFileView.SelectedItems.Clear();
                 ConvertedFileView.SelectedItems.Clear();
@@ -118,6 +136,7 @@ namespace JacobZ.Fluss.Win.Views
             }
 
             RefreshButtonState();
+            _focus_target = null;
             if (!_ctrl_pressed && e.AddedItems.Count > 0)
             {
                 OriginFileView.SelectedItems.Clear();
@@ -133,6 +152,7 @@ namespace JacobZ.Fluss.Win.Views
                 OutputSelected.Add(item as OperationTarget);
 
             RefreshButtonState();
+            _focus_target = null;
             if (!_ctrl_pressed && e.AddedItems.Count > 0)
             {
                 OriginFileView.SelectedItems.Clear();
@@ -147,10 +167,7 @@ namespace JacobZ.Fluss.Win.Views
 
         private void SourceSelected_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
-            if (SourceSelected.Count > 0)
-                PossibleOps.ItemsSource = OperationFactory.EntryOperationTypes.Where(
-                    op => OperationFactory.CheckOperation(op, SourceSelected.Select(target => target.Entry).ToArray()));
-            else PossibleOps.ItemsSource = Enumerable.Empty<Type>();
+            RefreshPossibleOps();
         }
 
         private void OutputSelected_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -172,6 +189,7 @@ namespace JacobZ.Fluss.Win.Views
         private void BatchWhenAdd_PropertyChanged(DependencyObject dp, DependencyPropertyChangedEventArgs e)
         {
             RefreshButtonState();
+            RefreshPossibleOps();
         }
 
         private IEnumerable<EntryCategory> CategoryValues
@@ -192,10 +210,30 @@ namespace JacobZ.Fluss.Win.Views
             OpOptions.IsEnabled = PossibleOps.SelectedItem != null;
         }
 
+        private void RefreshPossibleOps()
+        {
+            if (SourceSelected.Count > 0)
+                if (BatchWhenAdd)
+                {
+                    PossibleOps.ItemsSource = OperationFactory.EntryOperationTypes
+                        .Where(op => OperationFactory.CheckOperation(op, SourceSelected.Select(target => target.Entry).ToArray()))
+                        .Select(type => GetOperationTuple(OperationFactory.NewOperation(type))).ToList();
+                }
+                else
+                {
+                    PossibleOps.ItemsSource = SourceSelected
+                        .Select(target => OperationFactory.EntryOperationTypes
+                            .Where(op => OperationFactory.CheckOperation(op, new[] { target.Entry })))
+                        .Aggregate((p, n) => p.Intersect(n))
+                        .Select(type => GetOperationTuple(OperationFactory.NewOperation(type))).ToList();
+                }
+            else PossibleOps.ItemsSource = Enumerable.Empty<Tuple<IArchiveEntryOperation, string>>();
+        }
+
         private void AddOp_Click(object sender, RoutedEventArgs e)
         {
-            var operation = OperationFactory.NewOperation(PossibleOps.SelectedItem as Type);
-            if (BatchAdd.IsChecked.Value)
+            var operation = PossibleOps.SelectedValue as IArchiveEntryOperation;
+            if (BatchWhenAdd)
             {
                 foreach (var item in SourceSelected)
                 {
@@ -288,10 +326,10 @@ namespace JacobZ.Fluss.Win.Views
 
         private void OperationTarget_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            var target = (sender as ListViewItem).DataContext as OperationTarget;
-            System.Diagnostics.Debug.WriteLine("Double-clicked on " + target.FilePath);
-
-            // TODO: toggle operation editing
+            _focus_target = (sender as ListViewItem).DataContext as OperationTarget;
+            PossibleOps.ItemsSource = new[] { GetOperationTuple(
+                _owner.OperationQueue.GetPriorOperation(_focus_target).Operation) };
+            PossibleOps.SelectedIndex = 0;
         }
 
         private void OperationTarget_MouseEnter(object sender, MouseEventArgs e)
@@ -310,6 +348,14 @@ namespace JacobZ.Fluss.Win.Views
                 prior.HighlightInput = false;
             foreach (var post in _owner.OperationQueue.GetPosteriorTargets(target))
                 post.HighlightOutput = false;
+        }
+
+        private void OpOptions_Click(object sender, RoutedEventArgs e)
+        {
+            if (_focus_target != null)
+                throw new NotImplementedException(); // Edit exisiting operation
+            else
+                throw new NotImplementedException(); // Add attribute to selected operation
         }
     }
 }
