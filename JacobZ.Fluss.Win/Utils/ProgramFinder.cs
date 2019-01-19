@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using System.Threading.Tasks;
-using JacobZ.Fluss.Audio;
 using Microsoft.Win32;
+using JacobZ.Fluss.Audio;
+using JacobZ.Fluss.Utils;
 using JacobZ.Fluss.Operation;
 
 namespace JacobZ.Fluss.Win.Utils
@@ -13,14 +14,14 @@ namespace JacobZ.Fluss.Win.Utils
     {
         public static readonly string TempPath = Path.Combine(Path.GetTempPath(), "fluss");
 
-        public static void FindCodec(CodecType ext)
+        public static void FindCodec(AudioCodecType ext)
         {
             switch (ext)
             {
-                case CodecType.Wavpack:
+                case AudioCodecType.Wavpack:
                     WavPack.WavPackPath = SearchForExe("wavpack");
                     break;
-                case CodecType.TTA:
+                case AudioCodecType.TTA:
                     TTA.TTAPath = SearchForExe("tta");
                     break;
             }

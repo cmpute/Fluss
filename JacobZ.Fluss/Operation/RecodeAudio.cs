@@ -15,9 +15,9 @@ namespace JacobZ.Fluss.Operation
 
         public struct Meta
         {
-            public CodecType Type { get; set; }
+            public AudioCodecType Type { get; set; }
         }
-        Meta _props = new Meta() { Type = CodecType.Wavpack };
+        Meta _props = new Meta() { Type = AudioCodecType.Wavpack };
         public object Properties { get => _props; set => _props = (Meta)value; }
 
         public void Execute(IArchiveEntry[] entryIndices, params string[] outputPath)
@@ -30,15 +30,15 @@ namespace JacobZ.Fluss.Operation
 
             // Select codec
             string fext = Path.GetExtension(entryIndices[0].Key).ToLower();
-            CodecType tdec = CodecFactory.ParseCodec(fext);
-            decoder = CodecFactory.GetCodec(tdec);
-            encoder = CodecFactory.GetCodec(_props.Type);
+            AudioCodecType tdec = AudioCodecFactory.ParseCodec(fext);
+            decoder = AudioCodecFactory.GetCodec(tdec);
+            encoder = AudioCodecFactory.GetCodec(_props.Type);
 
             // Decompress audio file
             using (var fin = entryIndices[0].OpenEntryStream())
             using (var fout = File.OpenWrite(input))
                 fin.CopyTo(fout);
-            if (tdec == CodecType.Wavpack)
+            if (tdec == AudioCodecType.Wavpack)
             {
                 string finame = Path.GetFileNameWithoutExtension(entryIndices[0].Key) + ".wvc";
                 input2 = Path.Combine(TempPath, finame);
@@ -58,7 +58,7 @@ namespace JacobZ.Fluss.Operation
             // Clear temp files
             File.Delete(input);
             if (input2 != null) File.Delete(input2); // delete input wvc file
-            if (_props.Type == CodecType.Wavpack && outputPath.Length > 1) // move output wvc file
+            if (_props.Type == AudioCodecType.Wavpack && outputPath.Length > 1) // move output wvc file
             {
                 string fwv, fwvc;
                 if(Path.GetExtension(outputPath[0]) == ".wv")
@@ -81,16 +81,16 @@ namespace JacobZ.Fluss.Operation
             if (archiveEntries.Length > 1) return null;
             var fname = archiveEntries[0].Key;
             var fext = Path.GetExtension(fname).ToLower();
-            var oname = Path.GetFileName(fname);
+            var oname = Path.GetFileNameWithoutExtension(fname);
 
             // Check input
-            var tdec = CodecFactory.ParseCodec(fext);
-            if (tdec == CodecType.Unknown) return null;
+            var tdec = AudioCodecFactory.ParseCodec(fext);
+            if (tdec == AudioCodecType.Unknown) return null;
 
             // Generate output
             switch (_props.Type)
             {
-                case CodecType.Wavpack:
+                case AudioCodecType.Wavpack:
                     return new string[] { oname + ".wv", oname + ".wvc" };
             }
             return null;

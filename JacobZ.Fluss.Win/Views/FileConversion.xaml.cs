@@ -1,18 +1,16 @@
+using JacobZ.Fluss.Operation;
 using JacobZ.Fluss.Utils;
 using JacobZ.Fluss.Win.Models;
+using JacobZ.Fluss.Win.Utils;
+using SharpCompress.Archives;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using SharpCompress.Common;
-using SharpCompress.Archives;
-using JacobZ.Fluss.Operation;
-using JacobZ.Fluss.Win.Utils;
 
 namespace JacobZ.Fluss.Win.Views
 {
@@ -39,7 +37,7 @@ namespace JacobZ.Fluss.Win.Views
             OutputSelected.CollectionChanged += OutputSelected_CollectionChanged;
 
             // Using program finder
-            Audio.CodecFactory.CodecFinder = ProgramFinder.FindCodec;
+            AudioCodecFactory.CodecFinder = ProgramFinder.FindCodec;
         }
 
         static FileConversion _instance;
@@ -62,7 +60,9 @@ namespace JacobZ.Fluss.Win.Views
             { typeof(FixCuesheet), nameof(FixCuesheet) },
             { typeof(FixEncoding), nameof(FixEncoding) },
             { typeof(RecodeAudio), nameof(RecodeAudio) },
-            { typeof(EmbedCuesheet), nameof(EmbedCuesheet) }
+            { typeof(EmbedMetadata), nameof(EmbedMetadata) },
+            { typeof(RecodeImage), nameof(RecodeImage) },
+            { typeof(CutCover), nameof(CutCover) }
         };
         private Tuple<IArchiveEntryOperation, string> GetOperationTuple(IArchiveEntryOperation op)
         {
