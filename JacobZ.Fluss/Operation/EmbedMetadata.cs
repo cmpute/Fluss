@@ -51,7 +51,7 @@ namespace JacobZ.Fluss.Operation
             using (var sr = new BinaryReader(fcover))
                 cpic = new Picture(new ByteVector(sr.ReadBytes((int)fcover.Length)));
             cpic.Type = PictureType.FrontCover;
-            cpic.MimeType = "image/jpeg";
+            cpic.MimeType = "image/jpeg"; // TODO: infer mimetype?
             apetag.Pictures = new IPicture[] { cpic };
 
             tag.Save();

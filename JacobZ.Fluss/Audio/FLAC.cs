@@ -12,19 +12,12 @@ namespace JacobZ.Fluss.Audio
         
         public Stream Decode(string inputFile, PcmEncodingType type)
         {
-            Process exec = ProcessHelper.Generate(FLACPath, "-b", "-c", inputFile);
-            exec.StandardInput.Close();
-            exec.Start();
-            return new ProcessStream(exec, ProcessPipeType.Stdout);
+            return ProcessHelper.RunWithOutput(FLACPath, null, "-b", "-c", inputFile);
         }
 
         public void Encode(string outputFile, Stream input, PcmEncodingType type)
         {
-            Process exec = ProcessHelper.Generate(FLACPath, "-", "-o", outputFile);
-            exec.Start();
-            input.CopyTo(exec.StandardInput.BaseStream);
-            exec.StandardInput.Close();
-            exec.EnsureExit();
+            ProcessHelper.RunWithInput(FLACPath, input, null, "-", "-o", outputFile);
         }
     }
 }

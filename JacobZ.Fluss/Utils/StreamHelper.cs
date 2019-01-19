@@ -4,6 +4,8 @@ using System.IO;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace JacobZ.Fluss.Utils
 {
@@ -188,6 +190,7 @@ namespace JacobZ.Fluss.Utils
         }
         public override void Flush() => BaseStream.Flush();
         public override int Read(byte[] buffer, int offset, int count) => BaseStream.Read(buffer, offset, count);
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => BaseStream.ReadAsync(buffer, offset, count, cancellationToken);
         public override long Seek(long offset, SeekOrigin origin) => BaseStream.Seek(offset, origin);
         public override void SetLength(long value) => BaseStream.SetLength(value);
         public override void Write(byte[] buffer, int offset, int count) => BaseStream.Write(buffer, offset, count);
