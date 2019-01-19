@@ -7,11 +7,11 @@ namespace JacobZ.Fluss.Audio
         /// <summary>
         /// Encode audio into file
         /// </summary>
-        void Encode(string outputFile, Stream input, PcmEncodingType type);
+        void Encode(string outputFile, Stream input);
 
         /// <summary>
         /// Decode audio from file
         /// </summary>
-        Stream Decode(string inputFile, PcmEncodingType type);
+        Stream Decode(string inputFile);
     }
 }

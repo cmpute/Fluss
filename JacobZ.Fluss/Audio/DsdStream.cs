@@ -4,12 +4,7 @@ using System.Text;
 
 namespace JacobZ.Fluss.Audio
 {
-    public enum DsdEncodingType
-    {
-        RAW,
-        DSF,
-        DFF,
-    }
+    // Only support DSF format, transform input format (e.g. dff -> dsf) before using this class
     class DsdStream
     {
     }

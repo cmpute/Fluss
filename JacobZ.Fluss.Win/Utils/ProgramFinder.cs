@@ -21,7 +21,7 @@ namespace JacobZ.Fluss.Win.Utils
                 case AudioCodecType.Wavpack:
                     WavPack.WavPackPath = SearchForExe("wavpack");
                     break;
-                case AudioCodecType.TTA:
+                case AudioCodecType.TrueAudio:
                     TTA.TTAPath = SearchForExe("tta");
                     break;
             }

@@ -5,7 +5,7 @@ using System.Diagnostics;
 
 namespace JacobZ.Fluss.Utils
 {
-    public static class ProcessHelper
+    static class ProcessHelper
     {
         public static Process Generate(string executable, params string[] arguments)
         {
@@ -18,12 +18,7 @@ namespace JacobZ.Fluss.Utils
             exec.StartInfo.RedirectStandardOutput = true;
             exec.StartInfo.RedirectStandardError = false; // TODO: Add stderr log
             exec.StartInfo.FileName = executable;
-
-            // escape blanks
-            for (int i = 0; i < arguments.Length; i++)
-                if (arguments[i].Contains(" "))
-                    arguments[i] = "\"" + arguments[i] + "\"";
-            exec.StartInfo.Arguments = string.Join(" ", arguments);
+            exec.StartInfo.Arguments = arguments.JoinQuoteSpace();
 
             return exec;
         }

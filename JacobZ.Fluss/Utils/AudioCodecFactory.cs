@@ -16,7 +16,8 @@ namespace JacobZ.Fluss.Utils
             switch(ext)
             {
                 case "wv": return AudioCodecType.Wavpack;
-                case "tta": return AudioCodecType.TTA;
+                case "tta": return AudioCodecType.TrueAudio;
+                case "wav": return AudioCodecType.Wave;
                 default: return AudioCodecType.Unknown;
             }
         }
@@ -28,13 +29,15 @@ namespace JacobZ.Fluss.Utils
         {
             switch (type)
             {
+                case AudioCodecType.Wave:
+                    return new Wave();
                 case AudioCodecType.Wavpack:
                     if (WavPack.WavPackPath == null)
                         CodecFinder(AudioCodecType.Wavpack);
                     return new WavPack();
-                case AudioCodecType.TTA:
+                case AudioCodecType.TrueAudio:
                     if (TTA.TTAPath == null)
-                        CodecFinder(AudioCodecType.TTA);
+                        CodecFinder(AudioCodecType.TrueAudio);
                     return new TTA();
                 case AudioCodecType.Unknown:
                 default: return null;
@@ -44,7 +47,8 @@ namespace JacobZ.Fluss.Utils
     public enum AudioCodecType
     {
         Unknown,
+        Wave, // .wav
         Wavpack, // .wv
-        TTA, // .tta
+        TrueAudio, // .tta
     }
 }

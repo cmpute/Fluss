@@ -15,6 +15,7 @@ namespace JacobZ.Fluss.Operation
 
         public struct Meta
         {
+            public bool VerifyChecksum { get; set; } // TODO: Implement checksum
             public AudioCodecType Type { get; set; }
         }
         Meta _props = new Meta() { Type = AudioCodecType.Wavpack };
@@ -52,8 +53,8 @@ namespace JacobZ.Fluss.Operation
             }
 
             // Recode
-            var ts = decoder.Decode(input, PcmEncodingType.RAW);
-            encoder.Encode(outputPath[0], ts, PcmEncodingType.RAW);
+            var ts = decoder.Decode(input);
+            encoder.Encode(outputPath[0], ts);
 
             // Clear temp files
             File.Delete(input);
