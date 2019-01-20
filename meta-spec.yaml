@@ -1,0 +1,24 @@
+meta:
+  title: # album title
+  publisher:
+  vendor:
+  artist: # main artist
+  association:
+    anime:
+    movie:
+    <...>:
+  event: # release event
+  year: # release year
+  genre:
+
+<folder>: # CD/HiRes/DVD etc.
+  catalog: # UPC/ISRC number
+  partnumber: # disc number. (e.g. HLZY-0006)
+  edition: # 初回限定版 / 期间限定版 etc.
+  tool: # EAC / XLD / ImageISO etc.
+  source: # source (url)
+  ripper: # ripper
+  commment:
+  database:
+    xiami: # e.g. https://www.xiami.com/album/%%
+    vgmdb: # e.g. https://vgmdb.net/album/%%

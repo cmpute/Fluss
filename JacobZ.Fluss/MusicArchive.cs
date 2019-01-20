@@ -2,6 +2,7 @@
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using JacobZ.Fluss.Metadata;
 using SharpCompress.Archives;
 
 namespace JacobZ.Fluss
@@ -9,8 +10,8 @@ namespace JacobZ.Fluss
     public class MusicArchive
     {
         private string _root;
-        private readonly IArchive _archive;
         private List<IArchiveEntry> _entries;
+        private Album _meta;
 
         public MusicArchive(IArchive archive, string rootPath)
         {

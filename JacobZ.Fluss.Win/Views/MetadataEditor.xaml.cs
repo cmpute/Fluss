@@ -16,17 +16,26 @@ using System.Windows.Shapes;
 namespace JacobZ.Fluss.Win.Views
 {
     /// <summary>
-    /// MetaInfo.xaml 的交互逻辑
+    /// MetadataEditor.xaml 的交互逻辑
     /// </summary>
-    public partial class MetaInfo : Page
+    public partial class MetadataEditor : Page
     {
-        public MetaInfo()
+        MainWindow _owner;
+        public MetadataEditor(MainWindow owner)
         {
             InitializeComponent();
+            DataContext = this;
             _instance = this;
+
+            _owner = owner;
+            _owner.RootPathChanged += Owner_RootPathChanged;
         }
 
-        static MetaInfo _instance;
-        public static MetaInfo Instance { get => _instance; }
+        static MetadataEditor _instance;
+        public static MetadataEditor Instance { get => _instance; }
+
+        private void Owner_RootPathChanged(object sender, string e)
+        {
+        }
     }
 }

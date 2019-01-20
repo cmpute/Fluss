@@ -78,8 +78,8 @@
     <Compile Include="Views\FileConversion.xaml.cs">
       <DependentUpon>FileConversion.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Views\MetaInfo.xaml.cs">
-      <DependentUpon>MetaInfo.xaml</DependentUpon>
+    <Compile Include="Views\MetadataEditor.xaml.cs">
+      <DependentUpon>MetadataEditor.xaml</DependentUpon>
     </Compile>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -97,7 +97,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Views\MetaInfo.xaml">
+    <Page Include="Views\MetadataEditor.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

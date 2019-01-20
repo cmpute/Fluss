@@ -23,7 +23,7 @@ namespace JacobZ.Fluss.Win
             InitializeComponent();
 
             new Views.FileConversion(this);
-            new Views.MetaInfo();
+            new Views.MetadataEditor(this);
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -37,7 +37,7 @@ namespace JacobZ.Fluss.Win
             if (selected == (sender as ListBox).Items[0])
                 MainFrame.Navigate(Views.FileConversion.Instance);
             else if (selected == (sender as ListBox).Items[1])
-                MainFrame.Navigate(Views.MetaInfo.Instance);
+                MainFrame.Navigate(Views.MetadataEditor.Instance);
         }
 
         private void BrowseDirectoryButton_Click(object sender, RoutedEventArgs e)

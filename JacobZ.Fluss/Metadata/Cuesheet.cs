@@ -1,9 +1,10 @@
-﻿using System;
+﻿using JacobZ.Fluss.Utils;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace JacobZ.Fluss.Utils
+namespace JacobZ.Fluss.Metadata
 {
     /// <remarks> http://wiki.hydrogenaud.io/index.php?title=Cue_sheet </remarks>
     public class Cuesheet
