@@ -57,7 +57,6 @@ namespace JacobZ.Fluss.Win.Views
         Dictionary<Type, string> OperationNames => new Dictionary<Type, string>
         {
             { typeof(PassThrough), nameof(PassThrough) },
-            { typeof(FixCuesheet), nameof(FixCuesheet) },
             { typeof(FixEncoding), nameof(FixEncoding) },
             { typeof(RecodeAudio), nameof(RecodeAudio) },
             { typeof(EmbedMetadata), nameof(EmbedMetadata) },

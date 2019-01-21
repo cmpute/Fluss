@@ -1,0 +1,30 @@
+﻿<Page x:Class="JacobZ.Fluss.WinTool.Pages.ImageEditor"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:JacobZ.Fluss.WinTool.Pages"
+      mc:Ignorable="d" 
+      d:DesignHeight="450" d:DesignWidth="800"
+      Title="ImageEditor" Loaded="Page_Loaded">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Canvas x:Name="MainCanvas" Background="White"
+                MouseWheel="MainCanvas_MouseWheel" MouseMove="MainCanvas_MouseMove"
+                MouseDown="MainCanvas_MouseDown" MouseUp="MainCanvas_MouseUp">
+            <Border BorderThickness="2" BorderBrush="DarkGray">
+                <Image x:Name="MainImage"/>
+            </Border>
+            <Rectangle x:Name="CropBox" Visibility="Hidden" Stroke="Black" Fill="#19009B31"/>
+        </Canvas>
+        <StackPanel Orientation="Vertical" Margin="16" Grid.Column="1"
+                    Width="120" Background="#7F808080">
+            <TextBlock x:Name="SourceName" Margin="4" TextWrapping="Wrap" HorizontalAlignment="Right"/>
+            <Button x:Name="CutCover" Margin="4" Width="80" HorizontalAlignment="Right" Click="CutCover_Click">Crop Cover</Button>
+        </StackPanel>
+    </Grid>
+</Page>

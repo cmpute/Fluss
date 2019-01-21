@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JacobZ.Fluss", "JacobZ.Flus
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JacobZ.Fluss.Test", "JacobZ.Fluss.Test\JacobZ.Fluss.Test.csproj", "{3D6EB40E-4D95-4D0A-A470-A663DD3821C1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JacobZ.Fluss.WinTool", "JacobZ.Fluss.WinTool\JacobZ.Fluss.WinTool.csproj", "{545B6399-9297-456A-BD0E-A8FA62C7F883}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -29,6 +31,10 @@ Global
 		{3D6EB40E-4D95-4D0A-A470-A663DD3821C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3D6EB40E-4D95-4D0A-A470-A663DD3821C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3D6EB40E-4D95-4D0A-A470-A663DD3821C1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{545B6399-9297-456A-BD0E-A8FA62C7F883}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{545B6399-9297-456A-BD0E-A8FA62C7F883}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{545B6399-9297-456A-BD0E-A8FA62C7F883}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{545B6399-9297-456A-BD0E-A8FA62C7F883}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
