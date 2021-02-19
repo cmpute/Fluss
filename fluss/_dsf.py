@@ -84,7 +84,9 @@ class Dsf_read:
         if not dsd_valid_rate(fmt[6]):
             raise RuntimeError("Incorrent DSF sampling frequency!")
 
-        self._samplewidth = fmt[7]
+        self._samplewidth = 1
+        if fmt[7] not in [1, 8]:
+            raise RuntimeError("Incorrect bit depth")
         self._lsbfirst = fmt[7] == 1
 
         self._nframes = fmt[8]

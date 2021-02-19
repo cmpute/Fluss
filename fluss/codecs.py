@@ -3,16 +3,19 @@ import io
 import subprocess
 import wave
 from pathlib import Path
-from typing import List
+from typing import List, Type
 
 from fluss.config import global_config as C
+import mutagen
 import mutagen.flac
+import mutagen.wavpack
 import mutagen.apev2
 
 class Codec:
     def __init__(self, encode_args=None):
         '''
         encode_args: (extra) command line args for encoding, usually for adjusting compression level
+        TODO: if encode_args = None, read encode_args from config
         '''
         if encode_args is None:
             self.encode_args = []
@@ -21,10 +24,13 @@ class Codec:
         else:
             self.encode_args = [encode_args]
 
-    def encode(self, fout: str, wavein: bytes):
+    def encode(self, fout: str, wavein: bytes) -> None:
         raise NotImplementedError("Abstract function!")
 
     def decode(self, fin: str) -> wave.Wave_read:
+        raise NotImplementedError("Abstract function!")
+
+    def mutagen(self, fin: str) -> mutagen.FileType:
         raise NotImplementedError("Abstract function!")
 
     def __str__(self):
@@ -38,7 +44,7 @@ class flac(Codec):
         super().__init__(encode_args)
         assert Path(C.path.flac).exists()
 
-    def encode(self, fout: str, wavein: bytes):
+    def encode(self, fout: str, wavein: bytes) -> None:
         proc = subprocess.Popen([C.path.flac, "-sV", "-", "-o", fout] + self.encode_args, stdin=subprocess.PIPE)
         proc.communicate(wavein)
 
@@ -47,7 +53,7 @@ class flac(Codec):
         outs, _ = proc.communicate()
         return wave.open(io.BytesIO(outs), "rb")
 
-    def parse_meta(self, fin: str):
+    def mutagen(self, fin: str) -> mutagen.flac.FLAC:
         return mutagen.flac.FLAC(fin)
 
 class wavpack(Codec):
@@ -56,7 +62,7 @@ class wavpack(Codec):
         assert Path(C.path.wavpack).exists()
         assert Path(C.path.wvunpack).exists()
 
-    def encode(self, fout: str, wavein: bytes):
+    def encode(self, fout: str, wavein: bytes) -> None:
         proc = subprocess.Popen([C.path.wavpack, '-yq'] + self.encode_args + ["-", fout], stdin=subprocess.PIPE)
         proc.communicate(wavein)
 
@@ -65,8 +71,15 @@ class wavpack(Codec):
         outs, _ = proc.communicate()
         return wave.open(io.BytesIO(outs), "rb")
 
-    def parse_meta(self, fin: str):
-        return mutagen.apev2.APEv2File(fin)
+    def mutagen(self, fin: str) -> mutagen.wavpack.WavPack:
+        return mutagen.wavpack.WavPack(fin)
+
+def codec_from_filename(filename: str) -> Type[Codec]:
+    codec_map = {
+        ".wv": wavpack,
+        ".flac": flac
+    }
+    return codec_map[Path(filename).suffix]
 
 def merge_streams(streams: List[wave.Wave_read], fout: io.RawIOBase) -> None:
     '''
