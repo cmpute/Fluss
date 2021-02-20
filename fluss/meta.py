@@ -3,7 +3,7 @@ from typing import List, Set
 import mutagen
 from mutagen.flac import FLAC
 from mutagen.apev2 import APEv2File
-from mutagen.id3 import ID3
+from mutagen.id3 import ID3, PictureType
 from fluss.cuesheet import Cuesheet, CuesheetTrack, _default_cuesheet_file
 
 def assert_field(v1, v2, field_name):
@@ -24,9 +24,12 @@ class TrackMeta:
     def full_artist(self) -> str:
         return ', '.join(self.artists) if self.artists else None
 
-    def update(self, meta: "TrackMeta"):
-        if meta.title:
-            self.title = meta.title
+    def update(self, meta: "TrackMeta", overwrite: bool = True):
+        for key in ['title']:
+            new_value = getattr(meta, key, None)
+            old_value = getattr(self, key, None)
+            if (overwrite and new_value) or (not overwrite and not old_value):
+                setattr(self, key, new_value)
         self.artists.update(meta.artists)
 
 class DiscMeta:
@@ -55,25 +58,29 @@ class DiscMeta:
             for _ in range(len(self.tracks), track_idx):
                 self.tracks.append(TrackMeta())
 
-    def update(self, meta: "DiscMeta"):
+    def update(self, meta: "DiscMeta", overwrite: bool = True):
         '''
-        Update information from meta input. This function acts like :func:`dict.update()`
+        Update information from :attr:`meta` input. This function acts like :func:`dict.update()`
+
+        :overwrite: When values exist in both object, data from :attr:`meta` is chosen if True,
+            otherwise keep not modified
         '''
         # update simple fields
         for key in ['title', 'genre', 'date', 'cover']:
             new_value = getattr(meta, key, None)
-            if new_value:
+            old_value = getattr(self, key, None)
+            if (overwrite and new_value) or (not overwrite and not old_value):
                 setattr(self, key, new_value)
         self.artists.update(meta.artists)
         if self._cuesheet is None:
             self._cuesheet = meta._cuesheet
-        else:
-            self._cuesheet.update(meta._cuesheet)
+        elif meta._cuesheet is not None:
+            self._cuesheet.update(meta._cuesheet, overwrite=overwrite)
 
         # update tracks
         self._reserve_tracks(len(meta.tracks))
         for track, new_track in zip(self.tracks, meta.tracks):
-            track.update(new_track)
+            track.update(new_track, overwrite=overwrite)
 
     @classmethod
     def from_flac(cls, flac_meta: FLAC):
@@ -104,7 +111,12 @@ class DiscMeta:
         if flac_meta.cuesheet:
             meta._cuesheet = Cuesheet.from_flac(flac_meta.cuesheet)
         if flac_meta.pictures:
-            meta.cover = flac_meta.pictures # TODO: parse
+            for pic in flac_meta.pictures:
+                if pic.type == PictureType.COVER_FRONT:
+                    meta.cover = pic.data
+                    break
+            else:
+                meta.cover = flac_meta.pictures[0].data
 
         return meta
 
@@ -151,6 +163,7 @@ class DiscMeta:
                 meta.tracks[track_idx-1].title = track.title
                 if track.performer:
                     meta.tracks[track_idx-1].artists.add(track.performer)
+        return meta
 
     @property
     def cuesheet(self) -> Cuesheet:
@@ -184,17 +197,23 @@ class DiscMeta:
         raise NotImplementedError("Convert metadata to FLAC is not implemented!")
 
     def to_ape(self, ape_meta: APEv2File):
+        def add_if_exist(obj, tag_key):
+            if obj:
+                ape_meta.tags[tag_key] = obj
+
         if ape_meta.tags is None:
             ape_meta.add_tags()
-        if self.title:
-            ape_meta.tags['Album'] = self.title
-        if self.artists:
-            ape_meta.tags['Album artist'] = self.full_artist
+
+        add_if_exist(self.title, 'Album')
+        add_if_exist(self.full_artist, 'Album artist')
+        add_if_exist(self.cover, 'Cover Art (Front)')
+        add_if_exist(self.genre, 'Genre')
+        add_if_exist(self.date, 'Year')
         if self.cuesheet:
             ape_meta.tags['Cuesheet'] = str(self.cuesheet)
-        if self.cover:
-            ape_meta.tags['Cover Art (Front)'] = self.cover # TODO: parse
-        # TODO: parse other fields
+            if self.cuesheet.catalog:
+                add_if_exist(self.cuesheet.catalog, 'Catalog')
+                add_if_exist(self.cuesheet.rems.get('UPC', None), 'UPC')
 
     def to_mutagen(self, mutagen_file: mutagen.FileType):
         if isinstance(mutagen_file, FLAC):
@@ -206,9 +225,9 @@ class DiscMeta:
         else:
             raise ValueError("Unsupported mutagen format!")
 
-    def to_cuesheet(self, cuesheet: Cuesheet = None):
+    def to_cuesheet(self):
         '''
-        Generate cuesheet of vverride fields in given cuesheet according to this metadata
+        Generate a cuesheet according to this metadata
         '''
         gen = Cuesheet()
         gen.title = self.title
@@ -223,11 +242,10 @@ class DiscMeta:
             cuetrack.performer = track.full_artist
             gen.files[_default_cuesheet_file][track_idx + 1] = cuetrack
 
-        if cuesheet is not None:
-            cuesheet.update(gen)
-            return cuesheet
-        else:
-            return gen
+        if self._cuesheet is not None:
+            gen.update(self._cuesheet)
+
+        return gen
 
 class AlbumMeta: # corresponds to meta.yaml
     pass

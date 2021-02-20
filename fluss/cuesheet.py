@@ -37,11 +37,18 @@ class CuesheetTrack(object):
         self.pregap = None
         self.postgap = None
 
-    def update(self, cuetrack: "CuesheetTrack"):
+    def update(self, cuetrack: "CuesheetTrack", overwrite: bool = True):
         # merge simple fields
         for key in ['title', 'performer', 'index00', 'index01', 'isrc', 'pregap', 'postgap']:
             new_value = getattr(cuetrack, key, None)
-            if new_value:
+            old_value = getattr(self, key, None)
+            if key in ['index00', 'index01']:
+                new_exist = new_value is not None
+                old_exist = old_value is not None
+            else:
+                new_exist = bool(new_value)
+                old_exist = bool(old_value)
+            if (overwrite and new_exist) or (not overwrite and not old_exist):
                 setattr(self, key, new_value)
 
     def __str__(self):
@@ -69,7 +76,7 @@ class Cuesheet:
         self.catalog = None
         self.files = defaultdict(dict)
 
-    def update(self, cuesheet: "Cuesheet", merge_file: bool = None):
+    def update(self, cuesheet: "Cuesheet", overwrite: bool = True, merge_file: bool = None):
         '''
         :param merge_file: Whether merge track list to be under the same file.
             Only take place when both cuesheet has only one file.
@@ -78,9 +85,13 @@ class Cuesheet:
         # merge simple fields
         for key in ['title', 'performer', 'catalog']:
             new_value = getattr(cuesheet, key, None)
-            if new_value:
+            old_value = getattr(self, key, None)
+            if (overwrite and new_value) or (not overwrite and not old_value):
                 setattr(self, key, new_value)
-        self.rems.update(cuesheet.rems)
+        if overwrite:
+            self.rems.update(cuesheet.rems)
+        else:
+            self.rems = dict(cuesheet.rems, **self.rems)
 
         # merge tracks
         def merge_tracks(file_cur, file_merge):
@@ -88,7 +99,7 @@ class Cuesheet:
                 if track_idx not in self.files[file_cur]:
                     self.files[file_cur][track_idx] = track
                 else:
-                    self.files[file_cur][track_idx].update(track)
+                    self.files[file_cur][track_idx].update(track, overwrite=overwrite)
 
         if len(self.files) == 1 and len(cuesheet.files) == 1:
             file_cur = next(iter(self.files.keys()))
@@ -161,7 +172,7 @@ class Cuesheet:
                     elif int(idx) == 1:
                         cur_tracks[cur_idx].index01 = offset
                     else:
-                        raise ValueError("Track index %02d is not supported!" % idx)
+                        raise SyntaxError("Track index %02d is not supported!" % idx)
                 elif field == "PREGAP":
                     cur_tracks[cur_idx].pregap = _parse_index_point(value)
                 elif field == "POSTGAP":
@@ -171,7 +182,7 @@ class Cuesheet:
             elif line[:2] == "  ": # 1-2 spaces prefix
                 field, index, content = line[2:].split(" ")
                 if field.upper() != "TRACK":
-                    raise ValueError("Unrecognized line: " + line)
+                    raise SyntaxError("Unrecognized line: " + line)
                 if content != "AUDIO":
                     continue
                 cur_idx = int(index)
@@ -196,9 +207,9 @@ class Cuesheet:
                     cur_tracks.clear()
                     _, cur_file, file_type = value.split('"')
                     if file_type.strip() != "WAVE":
-                        raise ValueError("Unsupported media type: %s!" % file_type)
+                        raise SyntaxError("Unsupported media type: %s!" % file_type)
                 else:
-                    raise ValueError("Unrecognized line: " + line)
+                    raise SyntaxError("Unrecognized line: " + line)
 
         if cur_file is not None:
             cue.files[cur_file] = dict(cur_tracks)

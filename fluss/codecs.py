@@ -3,7 +3,7 @@ import io
 import subprocess
 import wave
 from pathlib import Path
-from typing import List, Type
+from typing import List, Type, Union
 
 from fluss.config import global_config as C
 import mutagen
@@ -81,15 +81,25 @@ def codec_from_filename(filename: str) -> Type[Codec]:
     }
     return codec_map[Path(filename).suffix]
 
-def merge_streams(streams: List[wave.Wave_read], fout: io.RawIOBase) -> None:
+def merge_streams(streams: List[Union[wave.Wave_read, float]], fout: io.RawIOBase) -> None:
     '''
     Merge audio streams and return merged streams and cuesheet
+
+    :param streams: if given float, it specifies a period of silence with given length
     '''
-    inited = False
+    params = None
     wave_out = wave.open(fout, "wb")
 
     for wave_in in streams:
-        if not inited:
-            wave_out.setparams(wave_in.getparams())
-            inited = True
-        wave_out.writeframes(wave_in.readframes(wave_in.getnframes()))
+        if params is None:
+            if not isinstance(wave_in, wave.Wave_read):
+                raise ValueError("Unable to insert silence at the beginning!")
+            params = wave_in.getparams()
+            wave_out.setparams(params)
+        if isinstance(wave_in, wave.Wave_read):
+            wave_out.writeframes(wave_in.readframes(wave_in.getnframes()))
+        elif isinstance(wave_in, float):
+            # nchannels * sampwidth * framerate * time
+            wave_out.writeframes(b'\0' * int(params[0]*params[1]*params[2]*wave_in))
+        else:
+            raise ValueError("Unsupported stream type!")
