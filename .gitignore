@@ -126,3 +126,6 @@ dmypy.json
 # Custom
 .vscode/settings.json
 codecs/
+
+# UI files
+fluss/apps/organizer/main_ui.py
