@@ -1,10 +1,11 @@
 from PySide6.QtGui import QAction, QContextMenuEvent, QKeyEvent
-from PySide6.QtWidgets import QAbstractItemView, QListWidget, QListWidgetItem, QMainWindow, QApplication, QFileDialog, QMenu
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QAbstractItemView, QListView, QListWidget, QListWidgetItem, QMainWindow, QApplication, QFileDialog, QMenu, QMessageBox
+from PySide6.QtCore import QModelIndex, Qt
 from fluss.apps.organizer.main_ui import Ui_MainWindow
-from fluss.apps.organizer.widgets import FolderOutputList
+from fluss.apps.organizer.widgets import TargetListModel
 from pathlib import Path
 from itertools import islice
+from networkx import DiGraph
 
 # TODO: add help (as below)
 # - you can drag file from input to output by pressing alt
@@ -12,31 +13,44 @@ from itertools import islice
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
+
         self._input_folder = None
+        self._network = DiGraph() # explicit targets dependencies
+        self._hovered_target = None
+        self._enable_cross_selection = False
 
         self.setupUi(self)
         self.retranslateUi(self)
         self.setupSignals()
-        self.createOutputFolder("CD")
+        self.addOutputFolder("CD")
 
-        self._last_selected_input = None
-        self._enable_cross_selection = False
+        # TODO: For debug
+        self.txt_input_path.setText(r"D:\Github\fluss\codecs")
 
     def setupSignals(self):
         self.btn_input_browse.clicked.connect(self.browseInput)
         self.btn_output_browse.clicked.connect(self.browseOutput)
         self.btn_close.clicked.connect(self.safeClose)
-        self.btn_add_folder.clicked.connect(lambda: self.createOutputFolder(self.txt_folder_name.currentText()))
+        self.btn_add_folder.clicked.connect(lambda: self.addOutputFolder(self.txt_folder_name.currentText()))
         self.btn_del_folder.clicked.connect(self.removeOutputFolder)
+        self.btn_reset.clicked.connect(self.reset)
         self.txt_input_path.textChanged.connect(self.inputChanged)
         self.list_input_files.itemDoubleClicked.connect(self.previewInput)
         self.list_input_files.itemPressed.connect(self.updateSelectedInput)
+        self.list_input_files.itemEntered.connect(self.updateHighlightInput)
         self.list_input_files.customContextMenuRequested.connect(self.inputContextMenu)
 
-    def createOutputFolder(self, name: str):
-        listview = FolderOutputList()
+    def addOutputFolder(self, name: str):
+        listview = QListView(self)
         listview.setObjectName("tab_" + name.lower())
+
+        listview.setSelectionMode(QListView.ExtendedSelection)
+        listview.setAcceptDrops(True)
+        listview.setModel(TargetListModel(parent=listview, network=self._network))
+        listview.pressed.connect(self.updateSelectedOutput)
+
         self.tab_folders.addTab(listview, name.upper())
+
         self.updateFolderNames()
 
     def removeOutputFolder(self):
@@ -55,11 +69,31 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_del_folder.setEnabled(self.tab_folders.count() > 0)
 
     def updateSelectedInput(self, item: QListWidgetItem):
-        self._last_selected_input = item
-
         if not self._enable_cross_selection:
             for i in range(self.tab_folders.count()):
                 self.tab_folders.widget(i).clearSelection()
+
+    def updateHighlightInput(self, item: QListWidgetItem):
+        print("Hover", item.text())
+
+    def getOutputListView(self, index: int) -> QListView:
+        return self.tab_folders.widget(index)
+
+    def getOutputList(self, index: int) -> TargetListModel:
+        return self.getOutputListView(index).model()
+
+    def getCurrentOutputListView(self) -> QListView:
+        return self.getOutputListView(self.tab_folders.currentIndex())
+
+    def getCurrentOutputList(self) -> TargetListModel:
+        return self.getCurrentOutputListView().model()
+
+    def updateSelectedOutput(self, index: QModelIndex):
+        if not self._enable_cross_selection:
+            self.list_input_files.clearSelection()
+            for i in range(self.tab_folders.count()):
+                if i != self.tab_folders.currentIndex():
+                    self.tab_folders.widget(i).clearSelection()
 
     def browseInput(self):
         dlg = QFileDialog()
@@ -86,7 +120,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def inputContextMenu(self, pos):
         menu = QMenu()
         preview_action = QAction("Preview", self.list_input_files)
-        preview_action.triggered.connect(lambda: self.previewInput(self._last_selected_input))
+        preview_action.triggered.connect(lambda: self.previewInput(self.list_input_files.currentItem()))
         menu.addAction(preview_action)
         # TODO: add actions for preview, add output etc.
         action = menu.exec_(self.list_input_files.mapToGlobal(pos))
@@ -104,15 +138,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                 remains = True
                 try:
-                    next(glob)
+                    remains = next(glob)
                 except StopIteration:
                     remains = False
-                # TODO: Prompt continuing when input directory is too large
+
                 if remains:
-                    print("Too many files, skip loading...")
-        else:
-            self._input_folder = None
-            self.list_input_files.clear()
+                    msgbox = QMessageBox(self)
+                    msgbox.setIcon(QMessageBox.Warning)
+                    msgbox.setText("There are too many files in the directory.")
+                    msgbox.setInformativeText("Do you still want to list them?")
+                    msgbox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+                    msgbox.setDefaultButton(QMessageBox.No)
+
+                    if msgbox.exec_() == QMessageBox.Yes:
+                        self.list_input_files.addItem(str(remains.relative_to(path)))
+                        files = [str(p.relative_to(path)) for p in glob]
+                        self.list_input_files.addItems(files)
+
+    def reset(self):
+        self._input_folder = None
+        self._hovered_target = None
+        self._network.clear()
+        self.list_input_files.clear()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         super().keyPressEvent(event)
