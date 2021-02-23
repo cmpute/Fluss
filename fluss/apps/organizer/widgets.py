@@ -1,5 +1,5 @@
 
-from PySide6.QtGui import QDropEvent, QStandardItemModel
+from PySide6.QtGui import QBrush, QColor, QDropEvent, QStandardItemModel
 from PySide6.QtWidgets import QAbstractItemView, QLineEdit, QListWidget, QListView
 from PySide6.QtCore import QAbstractListModel, QDataStream, QIODevice, QMimeData, QStringListModel, Qt, QModelIndex
 from pathlib import Path
@@ -30,23 +30,26 @@ class TargetListModel(QAbstractListModel):
     _targets: typing.List[OrganizeTarget]
     _network: DiGraph
 
-    def __init__(self, parent=None, targets=None, network=None) -> None:
+    def __init__(self, parent, network, states, targets=None) -> None:
         super().__init__(parent=parent)
         self._targets = targets or []
         self._network = network
+        self._states = states
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._targets)
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole):
+        target = self._targets[index.row()]
         if role == Qt.DisplayRole:
-            target = self._targets[index.row()]
             if isinstance(target, CopyTarget):
                 return target.output_name + " (copy)"
             if isinstance(target, (TranscodeTextTarget, TranscodePictureTarget)):
                 return target.output_name + " (convert)"
-        # elif role == Qt.BackgroundColorRole:
-        #     return Qt.darkBlue
+        elif role == Qt.BackgroundRole:
+            if self._states.hovered is not None and \
+                target in self._network.successors(self._states.hovered):
+                return QBrush(QColor(200, 200, 255, 255))
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         return super().flags(index) | Qt.ItemIsDropEnabled

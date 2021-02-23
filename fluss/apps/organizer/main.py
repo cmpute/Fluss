@@ -1,11 +1,12 @@
-from PySide6.QtGui import QAction, QContextMenuEvent, QKeyEvent
+from PySide6.QtGui import QAction, QBrush, QColor, QContextMenuEvent, QKeyEvent
 from PySide6.QtWidgets import QAbstractItemView, QListView, QListWidget, QListWidgetItem, QMainWindow, QApplication, QFileDialog, QMenu, QMessageBox
-from PySide6.QtCore import QModelIndex, Qt
+from PySide6.QtCore import QModelIndex, Qt, Signal
 from fluss.apps.organizer.main_ui import Ui_MainWindow
 from fluss.apps.organizer.widgets import TargetListModel
 from pathlib import Path
 from itertools import islice
 from networkx import DiGraph
+from addict import Dict as edict
 
 # TODO: add help (as below)
 # - you can drag file from input to output by pressing alt
@@ -16,7 +17,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self._input_folder = None
         self._network = DiGraph() # explicit targets dependencies
-        self._hovered_target = None
+        self._shared_states = edict(hovered=None)
         self._enable_cross_selection = False
 
         self.setupUi(self)
@@ -38,7 +39,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.list_input_files.itemDoubleClicked.connect(self.previewInput)
         self.list_input_files.itemPressed.connect(self.updateSelectedInput)
         self.list_input_files.itemEntered.connect(self.updateHighlightInput)
+        self.list_input_files.leaveEvent = self.listInputViewLeave
         self.list_input_files.customContextMenuRequested.connect(self.inputContextMenu)
+
+    def listInputViewLeave(self, event):
+        self._shared_states.hovered = None
+
+    def updateHighlightOutput(self, index: QModelIndex):
+        self._shared_states.hovered = self.getCurrentOutputList()._targets[index.row()]
+        for i in range(self.list_input_files.count()):
+            if self.list_input_files.item(i).text() in self._network.predecessors(self._shared_states.hovered):
+                self.list_input_files.item(i).setBackground(QBrush(QColor(255, 200, 200, 255)))
+            else:
+                self.list_input_files.item(i).setBackground(QBrush())
+
+    def listOutputViewLeave(self, event):
+        self._shared_states.hovered = None
+        for i in range(self.list_input_files.count()):
+            self.list_input_files.item(i).setBackground(QBrush())
 
     def addOutputFolder(self, name: str):
         listview = QListView(self)
@@ -46,8 +64,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         listview.setSelectionMode(QListView.ExtendedSelection)
         listview.setAcceptDrops(True)
-        listview.setModel(TargetListModel(parent=listview, network=self._network))
+        listview.setMouseTracking(True)
+        listview.setModel(TargetListModel(listview, self._network, self._shared_states))
         listview.pressed.connect(self.updateSelectedOutput)
+        listview.entered.connect(self.updateHighlightOutput)
+        listview.leaveEvent = self.listOutputViewLeave
 
         self.tab_folders.addTab(listview, name.upper())
 
@@ -74,7 +95,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.tab_folders.widget(i).clearSelection()
 
     def updateHighlightInput(self, item: QListWidgetItem):
-        print("Hover", item.text())
+        self._shared_states.hovered = item.text()
+        
+        start = QModelIndex()
+        start = self.getCurrentOutputList().createIndex(0,0)
+        end = self.getCurrentOutputList().createIndex(-1,0)
+        self.getCurrentOutputListView().dataChanged(start, end, [Qt.BackgroundRole])
+        # print("Successor", self._network.successors(item.text()))
+        # for i in range(self.tab_folders.count()):
+        #     self.tab_folders.widget(i).
+        # print("Hover", item.text())
 
     def getOutputListView(self, index: int) -> QListView:
         return self.tab_folders.widget(index)
@@ -83,7 +113,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return self.getOutputListView(index).model()
 
     def getCurrentOutputListView(self) -> QListView:
-        return self.getOutputListView(self.tab_folders.currentIndex())
+        return self.tab_folders.currentWidget()
 
     def getCurrentOutputList(self) -> TargetListModel:
         return self.getCurrentOutputListView().model()
@@ -135,6 +165,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 glob = (p for p in path.rglob("*") if p.is_file())
                 files = [str(p.relative_to(path)) for p in islice(glob, 50)]
                 self.list_input_files.addItems(files)
+                self._network.add_nodes_from(files)
 
                 remains = True
                 try:
@@ -152,12 +183,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                     if msgbox.exec_() == QMessageBox.Yes:
                         self.list_input_files.addItem(str(remains.relative_to(path)))
+                        self._network.add_node(str(remains.relative_to(path)))
+
                         files = [str(p.relative_to(path)) for p in glob]
                         self.list_input_files.addItems(files)
+                        self._network.add_nodes_from(files)
 
     def reset(self):
         self._input_folder = None
-        self._hovered_target = None
+        self._shared_states = edict(hovered=None)
         self._network.clear()
         self.list_input_files.clear()
 
