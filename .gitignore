@@ -128,4 +128,4 @@ dmypy.json
 codecs/
 
 # UI files
-fluss/apps/organizer/main_ui.py
+fluss/apps/organizer/*_ui.py

@@ -1,12 +1,16 @@
-from PySide6.QtGui import QAction, QBrush, QColor, QContextMenuEvent, QKeyEvent
-from PySide6.QtWidgets import QAbstractItemView, QListView, QListWidget, QListWidgetItem, QMainWindow, QApplication, QFileDialog, QMenu, QMessageBox
-from PySide6.QtCore import QModelIndex, Qt, Signal
+from itertools import islice
+from pathlib import Path
+
+from addict import Dict as edict
 from fluss.apps.organizer.main_ui import Ui_MainWindow
 from fluss.apps.organizer.widgets import TargetListModel
-from pathlib import Path
-from itertools import islice
+from fluss.apps.organizer.targets import target_types
 from networkx import DiGraph
-from addict import Dict as edict
+from PySide6.QtCore import QModelIndex, QPoint, Qt, Signal
+from PySide6.QtGui import QAction, QBrush, QColor, QContextMenuEvent, QKeyEvent
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog,
+                               QListView, QListWidget, QListWidgetItem,
+                               QMainWindow, QMenu, QMessageBox)
 
 # TODO: add help (as below)
 # - you can drag file from input to output by pressing alt
@@ -26,7 +30,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.addOutputFolder("CD")
 
         # TODO: For debug
-        self.txt_input_path.setText(r"D:\Github\fluss\codecs")
+        
 
     def setupSignals(self):
         self.btn_input_browse.clicked.connect(self.browseInput)
@@ -45,18 +49,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def listInputViewLeave(self, event):
         self._shared_states.hovered = None
 
-    def updateHighlightOutput(self, index: QModelIndex):
-        self._shared_states.hovered = self.getCurrentOutputList()._targets[index.row()]
+    def refreshInputBgcolor(self):
         for i in range(self.list_input_files.count()):
-            if self.list_input_files.item(i).text() in self._network.predecessors(self._shared_states.hovered):
-                self.list_input_files.item(i).setBackground(QBrush(QColor(255, 200, 200, 255)))
+            item = self.list_input_files.item(i)
+            if self._shared_states.hovered is not None and \
+               item.text() in self._network.predecessors(self._shared_states.hovered):
+                item.setBackground(QBrush(QColor(255, 200, 200, 255)))
+            elif len(list(self._network.successors(item.text()))):
+                item.setBackground(QBrush(QColor(200, 255, 200, 255)))
             else:
-                self.list_input_files.item(i).setBackground(QBrush())
+                item.setBackground(QBrush())
+
+    def updateHighlightOutput(self, index: QModelIndex):
+        self._shared_states.hovered = self.currentOutputList[index.row()]
+        self.refreshInputBgcolor()
 
     def listOutputViewLeave(self, event):
         self._shared_states.hovered = None
-        for i in range(self.list_input_files.count()):
-            self.list_input_files.item(i).setBackground(QBrush())
+        self.refreshInputBgcolor()
 
     def addOutputFolder(self, name: str):
         listview = QListView(self)
@@ -69,6 +79,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         listview.pressed.connect(self.updateSelectedOutput)
         listview.entered.connect(self.updateHighlightOutput)
         listview.leaveEvent = self.listOutputViewLeave
+        listview.setContextMenuPolicy(Qt.CustomContextMenu)
+        listview.customContextMenuRequested.connect(lambda pos: self.outputContextMenu(listview, pos))
 
         self.tab_folders.addTab(listview, name.upper())
 
@@ -98,25 +110,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._shared_states.hovered = item.text()
         
         start = QModelIndex()
-        start = self.getCurrentOutputList().createIndex(0,0)
-        end = self.getCurrentOutputList().createIndex(-1,0)
-        self.getCurrentOutputListView().dataChanged(start, end, [Qt.BackgroundRole])
-        # print("Successor", self._network.successors(item.text()))
-        # for i in range(self.tab_folders.count()):
-        #     self.tab_folders.widget(i).
-        # print("Hover", item.text())
+        start = self.currentOutputList.createIndex(0,0)
+        end = self.currentOutputList.createIndex(-1,0)
+        self.currentOutputListView.dataChanged(start, end, [Qt.BackgroundRole])
 
-    def getOutputListView(self, index: int) -> QListView:
-        return self.tab_folders.widget(index)
-
-    def getOutputList(self, index: int) -> TargetListModel:
-        return self.getOutputListView(index).model()
-
-    def getCurrentOutputListView(self) -> QListView:
+    @property
+    def currentOutputListView(self) -> QListView:
         return self.tab_folders.currentWidget()
 
-    def getCurrentOutputList(self) -> TargetListModel:
-        return self.getCurrentOutputListView().model()
+    @property
+    def currentOutputList(self) -> TargetListModel:
+        return self.currentOutputListView.model()
 
     def updateSelectedOutput(self, index: QModelIndex):
         if not self._enable_cross_selection:
@@ -140,20 +144,54 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.txt_output_path.setText(dlg.selectedFiles()[0])
 
     def safeClose(self):
-        # TODO: prompt confirmation
-        self.close()
+        msgbox = QMessageBox(self)
+        msgbox.setIcon(QMessageBox.Warning)
+        msgbox.setText("Do you really want to close?")
+        msgbox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msgbox.setDefaultButton(QMessageBox.No)
 
-    def previewInput(self, item: QListWidgetItem):
+        if msgbox.exec_() == QMessageBox.Yes:
+            self.close()
+
+    def previewInput(self, item: str):
         # TODO: preview items
-        print("Preview", item.text())
+        print("Preview", item)
 
-    def inputContextMenu(self, pos):
+    def inputContextMenu(self, pos: QPoint):
         menu = QMenu()
-        preview_action = QAction("Preview", self.list_input_files)
-        preview_action.triggered.connect(lambda: self.previewInput(self.list_input_files.currentItem()))
+        preview_action = QAction("Preview", menu)
+        preview_action.triggered.connect(lambda: self.previewInput(self.list_input_files.currentItem().text()))
         menu.addAction(preview_action)
-        # TODO: add actions for preview, add output etc.
+
+        output_menu = menu.addMenu("Add output")
+        selected_items = [i.text() for i in self.list_input_files.selectedItems()]
+        selected_items += [self.currentOutputList[i.row()] for i in self.currentOutputListView.selectedIndexes()]
+        for t in target_types:
+            if t.validate(selected_items):
+                create_action = QAction(t.description, menu)
+                # cannot use default arg to force coping the type here, since the signal also provides other inputs
+                create_func = lambda _t: lambda: self.currentOutputList.appendTarget(_t(selected_items))
+                create_action.triggered.connect(create_func(t))
+                output_menu.addAction(create_action)
+        if len(output_menu.actions()) == 0:
+            output_menu.setEnabled(False)
+
         action = menu.exec_(self.list_input_files.mapToGlobal(pos))
+
+    def outputContextMenu(self, listview: QListView, pos: QPoint):
+        menu = QMenu()
+        edit_action = QAction("Edit", menu)
+        edit_action.triggered.connect(lambda: listview.model()[listview.currentIndex().row()].edit(
+            input_root=self.txt_input_path.text(),
+            output_root=Path(self.txt_output_path.text(), self.tab_folders.tabText(self.tab_folders.currentIndex()))
+        ))
+        menu.addAction(edit_action)
+        delete_action = QAction("Remove", menu)
+        delete_action.triggered.connect(lambda: listview.model().__delitem__(
+            [i.row() for i in listview.selectedIndexes()]
+        ))
+        menu.addAction(delete_action)
+        menu.exec_(listview.mapToGlobal(pos))
 
     def inputChanged(self, content):
         path = Path(content).resolve()
@@ -194,6 +232,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._shared_states = edict(hovered=None)
         self._network.clear()
         self.list_input_files.clear()
+        for i in range(self.tab_folders.count()):
+            model = (self.tab_folders.widget(i)).model()
+            model.removeRows(0, len(model), QModelIndex())
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         super().keyPressEvent(event)

@@ -1,11 +1,16 @@
 
-from PySide6.QtGui import QBrush, QColor, QDropEvent, QStandardItemModel
-from PySide6.QtWidgets import QAbstractItemView, QLineEdit, QListWidget, QListView
-from PySide6.QtCore import QAbstractListModel, QDataStream, QIODevice, QMimeData, QStringListModel, Qt, QModelIndex
-from pathlib import Path
-from fluss.apps.organizer.targets import OrganizeTarget, CopyTarget, TranscodePictureTarget, TranscodeTextTarget, TranscodeTracksTarget
 import typing
+from pathlib import Path
+
+from fluss.apps.organizer.targets import (CopyTarget, OrganizeTarget,
+                                          TranscodePictureTarget,
+                                          TranscodeTextTarget,
+                                          TranscodeTracksTarget)
 from networkx import DiGraph
+from PySide6.QtCore import QAbstractListModel, QMimeData, QModelIndex, Qt
+from PySide6.QtGui import QBrush, QColor, QDropEvent
+from PySide6.QtWidgets import QLineEdit, QListView, QListWidget
+
 
 class DirectoryEdit(QLineEdit):
     def __init__(self, parent) -> None:
@@ -36,6 +41,21 @@ class TargetListModel(QAbstractListModel):
         self._network = network
         self._states = states
 
+    def __len__(self):
+        return len(self._targets)
+
+    def __getitem__(self, index):
+        return self._targets[index]
+
+    def __delitem__(self, index):
+        if isinstance(index, int):
+            self.removeRow(index, QModelIndex())
+        elif isinstance(index, list):
+            for row in sorted(index, reverse=True):
+                self.removeRow(row, QModelIndex())
+        else:
+            raise ValueError("Only support deleting one element")
+
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._targets)
 
@@ -44,8 +64,10 @@ class TargetListModel(QAbstractListModel):
         if role == Qt.DisplayRole:
             if isinstance(target, CopyTarget):
                 return target.output_name + " (copy)"
-            if isinstance(target, (TranscodeTextTarget, TranscodePictureTarget)):
+            elif isinstance(target, (TranscodeTextTarget, TranscodePictureTarget)):
                 return target.output_name + " (convert)"
+            elif isinstance(target, OrganizeTarget):
+                return "(dummy)"
         elif role == Qt.BackgroundRole:
             if self._states.hovered is not None and \
                 target in self._network.successors(self._states.hovered):
@@ -65,18 +87,40 @@ class TargetListModel(QAbstractListModel):
 
     def insertRows(self, row: int, count: int, parent: QModelIndex) -> bool:
         super().beginInsertRows(parent, row, row + count)
-        self._targets[row:row] = [CopyTarget([""]) for _ in range(count)]
+        self._targets[row:row] = [OrganizeTarget(None) for _ in range(count)]
         super().endInsertRows()
         return True
 
-    def setData(self, index: QModelIndex, value: typing.Any, role: int) -> bool:
-        target = self._targets[index.row()]
-        if target._input[0]:
-            self._network.remove_edge(target._input[0], target)
-        target._input = [value]
-        self._network.add_edge(value, target)
+    def appendTarget(self, target: OrganizeTarget) -> None:
+        super().beginInsertRows(QModelIndex(), len(self._targets), len(self._targets)+1)
+        self._targets.append(target)
+        self._network.add_node(target)
+        for tin in target._input:
+            self._network.add_edge(tin, target)
+        super().endInsertRows()
+
+    def removeRows(self, row: int, count: int, parent: QModelIndex) -> bool:
+        super().beginRemoveRows(parent, row, row + count)
+        self._network.remove_nodes_from(self._targets[row:row+count])
+        self._targets[row:row + count] = []
+        super().endRemoveRows()
         return True
 
-    def itemData(self, index: QModelIndex) -> typing.Dict:
-        print("ITEM_DATA")
-        return super().itemData(index)
+    def removeRow(self, row: int, parent: QModelIndex) -> bool:
+        super().beginRemoveRows(parent, row, row + 1)
+        self._network.remove_node(self._targets[row])
+        del self._targets[row]
+        super().endRemoveRows()
+        return True
+
+    def setData(self, index: QModelIndex, value: typing.Any, role: int) -> bool:
+        if role == Qt.DisplayRole:
+            if type(self._targets[index.row()]) == OrganizeTarget:
+                target = CopyTarget([value])
+                self._targets[index.row()] = target
+                self._network.add_edge(value, target)
+                return True
+            else:
+                raise RuntimeError("Unexpected setData() call")
+        else:
+            return False
