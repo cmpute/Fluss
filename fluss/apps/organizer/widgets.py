@@ -8,8 +8,8 @@ from fluss.apps.organizer.targets import (CopyTarget, OrganizeTarget,
                                           TranscodeTracksTarget)
 from networkx import DiGraph
 from PySide6.QtCore import QAbstractListModel, QMimeData, QModelIndex, Qt
-from PySide6.QtGui import QBrush, QColor, QDropEvent
-from PySide6.QtWidgets import QLineEdit, QListView, QListWidget
+from PySide6.QtGui import QBrush, QColor, QDropEvent, QResizeEvent
+from PySide6.QtWidgets import QLineEdit, QListView, QListWidget, QWidget, QLabel, QFrame, QApplication
 from typing import List
 
 
@@ -134,3 +134,56 @@ class TargetListModel(QAbstractListModel):
                 raise RuntimeError("Unexpected setData() call")
         else:
             return False
+
+class KeywordPanel(QWidget):
+    _labels: List[QLabel]
+
+    def __init__(self, parent) -> None:
+        super().__init__(parent=parent)
+
+        self._keywords = []
+        self._labels = []
+        # TODO: reuse labels
+        # TODO: add scroll bar
+
+    def extendKeywords(self, keywords: List[str]):
+        for kw in keywords:
+            self._keywords.append(kw)
+
+            label = QLabel(kw, self)
+            label.setAutoFillBackground(True)
+            label.setFrameShape(QFrame.Panel)
+            label.setFrameShadow(QFrame.Raised)
+            def click(_label):
+                return lambda event: QApplication.clipboard().setText(_label.text())
+            label.mousePressEvent = click(label)
+
+            label.show()
+            self._labels.append(label)
+        self.resizeEvent(None)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        self.renderLabels()
+        return super().resizeEvent(event)
+
+    def renderLabels(self) -> None:
+        colPadding = rowPadding = 2
+        leftMargin = rightMargin = 5
+        x = leftMargin
+        y = rowPadding
+        for label in self._labels:
+            if x + label.width() + rightMargin > self.width():
+                x = leftMargin
+                y += label.height() + rowPadding
+            label.move(x, y)
+            x += label.width() + colPadding
+
+        if len(self._labels) > 0:
+            self.setMinimumHeight(self._labels[0].height() + rowPadding * 2)
+
+    def clear(self):
+        for label in self._labels:
+            label.hide()
+        self._labels.clear()
+        self._keywords.clear()
+        self.setMinimumHeight(0)

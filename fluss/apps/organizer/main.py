@@ -1,15 +1,17 @@
 from itertools import islice
 from pathlib import Path
 
+import re
 from addict import Dict as edict
 import fluss.apps.organizer.main_rc
 from fluss.apps.organizer.main_ui import Ui_MainWindow
 from fluss.apps.organizer.widgets import TargetListModel
 from fluss.apps.organizer.targets import target_types, _get_icon
+from fluss.config import global_config
 from networkx import DiGraph
 from PySide6.QtCore import QModelIndex, QPoint, QUrl, Qt, Signal, QSize
 from PySide6.QtGui import QAction, QBrush, QColor, QContextMenuEvent, QKeyEvent, QDesktopServices, QIcon
-from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog,
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog, QFrame, QLabel,
                                QListView, QListWidget, QListWidgetItem,
                                QMainWindow, QMenu, QMessageBox)
 
@@ -32,9 +34,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # load resources
         self.setWindowIcon(_get_icon())
+        for format in global_config.output_format:
+            self.cbox_output_type.addItem(format)
 
         # TODO: For debug
-
 
     def setupSignals(self):
         self.btn_input_browse.clicked.connect(self.browseInput)
@@ -96,7 +99,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def updateFolderNames(self):
         # update valid folder names
-        valid_folders = set(['CD', 'BK', 'DVD', 'DL', 'OL', 'MISC', 'PHOTO'])
+        valid_folders = set(['CD', 'BK', 'DVD', 'DL', 'OL', 'MISC', 'PHOTO', 'LRC'])
         current_folders = set([self.tab_folders.tabText(i) for i in range(self.tab_folders.count())])
         valid_folders = list(valid_folders.difference(current_folders))
         self.txt_folder_name.clear()
@@ -206,42 +209,64 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def inputChanged(self, content):
         path = Path(content).resolve()
         
-        if content and path.exists():
-            if self._input_folder != path:
-                self._input_folder = path
-                self.list_input_files.clear()
-                glob = (p for p in path.rglob("*") if p.is_file())
-                files = [str(p.relative_to(path)) for p in islice(glob, 50)]
-                self.list_input_files.addItems(files)
-                self._network.add_nodes_from(files)
+        if not (content and path.exists()):
+            return
+        if self._input_folder == path:
+            return
 
-                remains = True
-                try:
-                    remains = next(glob)
-                except StopIteration:
-                    remains = False
+        self.reset()
 
-                if remains:
-                    msgbox = QMessageBox(self)
-                    msgbox.setIcon(QMessageBox.Warning)
-                    msgbox.setText("There are too many files in the directory.")
-                    msgbox.setInformativeText("Do you still want to list them?")
-                    msgbox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-                    msgbox.setDefaultButton(QMessageBox.No)
+        # read file list
+        self._input_folder = path
+        glob = (p for p in path.rglob("*") if p.is_file())
+        files = [str(p.relative_to(path)) for p in islice(glob, 50)]
+        self.list_input_files.addItems(files)
+        self._network.add_nodes_from(files)
 
-                    if msgbox.exec_() == QMessageBox.Yes:
-                        self.list_input_files.addItem(str(remains.relative_to(path)))
-                        self._network.add_node(str(remains.relative_to(path)))
+        # read more files
+        remains = True
+        try:
+            remains = next(glob)
+        except StopIteration:
+            remains = False
 
-                        files = [str(p.relative_to(path)) for p in glob]
-                        self.list_input_files.addItems(files)
-                        self._network.add_nodes_from(files)
+        if remains:
+            msgbox = QMessageBox(self)
+            msgbox.setIcon(QMessageBox.Warning)
+            msgbox.setText("There are too many files in the directory.")
+            msgbox.setInformativeText("Do you still want to list them?")
+            msgbox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            msgbox.setDefaultButton(QMessageBox.No)
+
+            if msgbox.exec_() != QMessageBox.Yes:
+                self.reset()
+                return
+
+            self.list_input_files.addItem(str(remains.relative_to(path)))
+            self._network.add_node(str(remains.relative_to(path)))
+
+            files = [str(p.relative_to(path)) for p in glob]
+            self.list_input_files.addItems(files)
+            self._network.add_nodes_from(files)
+
+        # generate keywords
+        keywords = []
+        delimits = r';| - |\[|\]|\(|\)'
+        folder = Path(self.txt_input_path.text()).name
+        for word in re.split(delimits, folder):
+            word = word.strip()
+            if word:
+                keywords.append(word)
+        # TODO: iterate over input files
+
+        self.widget_keywords.extendKeywords(keywords)
 
     def reset(self):
         self._input_folder = None
         self._shared_states = edict(hovered=None)
         self._network.clear()
         self.list_input_files.clear()
+        self.widget_keywords.clear()
         for i in range(self.tab_folders.count()):
             model = (self.tab_folders.widget(i)).model()
             model.removeRows(0, len(model), QModelIndex())
