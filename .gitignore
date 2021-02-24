@@ -129,3 +129,4 @@ codecs/
 
 # UI files
 fluss/apps/organizer/*_ui.py
+fluss/apps/organizer/*_rc.py

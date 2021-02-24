@@ -2,12 +2,13 @@ from itertools import islice
 from pathlib import Path
 
 from addict import Dict as edict
+import fluss.apps.organizer.main_rc
 from fluss.apps.organizer.main_ui import Ui_MainWindow
 from fluss.apps.organizer.widgets import TargetListModel
-from fluss.apps.organizer.targets import target_types
+from fluss.apps.organizer.targets import target_types, _get_icon
 from networkx import DiGraph
-from PySide6.QtCore import QModelIndex, QPoint, Qt, Signal
-from PySide6.QtGui import QAction, QBrush, QColor, QContextMenuEvent, QKeyEvent
+from PySide6.QtCore import QModelIndex, QPoint, QUrl, Qt, Signal, QSize
+from PySide6.QtGui import QAction, QBrush, QColor, QContextMenuEvent, QKeyEvent, QDesktopServices, QIcon
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog,
                                QListView, QListWidget, QListWidgetItem,
                                QMainWindow, QMenu, QMessageBox)
@@ -29,8 +30,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupSignals()
         self.addOutputFolder("CD")
 
+        # load resources
+        self.setWindowIcon(_get_icon())
+
         # TODO: For debug
-        
+
 
     def setupSignals(self):
         self.btn_input_browse.clicked.connect(self.browseInput)
@@ -153,28 +157,34 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if msgbox.exec_() == QMessageBox.Yes:
             self.close()
 
-    def previewInput(self, item: str):
-        # TODO: preview items
-        print("Preview", item)
+    def previewInput(self, item: QListWidgetItem):
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(self.txt_input_path.text(), item.text()))))
 
     def inputContextMenu(self, pos: QPoint):
         menu = QMenu()
         preview_action = QAction("Preview", menu)
-        preview_action.triggered.connect(lambda: self.previewInput(self.list_input_files.currentItem().text()))
+        preview_action.triggered.connect(lambda: self.previewInput(self.list_input_files.currentItem()))
         menu.addAction(preview_action)
 
-        output_menu = menu.addMenu("Add output")
         selected_items = [i.text() for i in self.list_input_files.selectedItems()]
         selected_items += [self.currentOutputList[i.row()] for i in self.currentOutputListView.selectedIndexes()]
+        
+        menu.addSeparator()
+        # cannot use default arg to force coping the type here, since the signal also provides other inputs
+        func_create = lambda _t, items: lambda: self.currentOutputList.appendTarget(_t(items))
         for t in target_types:
             if t.validate(selected_items):
                 create_action = QAction(t.description, menu)
-                # cannot use default arg to force coping the type here, since the signal also provides other inputs
-                create_func = lambda _t: lambda: self.currentOutputList.appendTarget(_t(selected_items))
-                create_action.triggered.connect(create_func(t))
-                output_menu.addAction(create_action)
-        if len(output_menu.actions()) == 0:
-            output_menu.setEnabled(False)
+                create_action.triggered.connect(func_create(t, selected_items))
+                menu.addAction(create_action)
+
+        menu.addSeparator()
+        func_create_batch = lambda _t, items: lambda: self.currentOutputList.extendTargets([_t(i) for i in items])
+        for t in target_types:
+            if all(t.validate([item]) for item in selected_items):
+                create_action = QAction("Batch " + t.description, menu)
+                create_action.triggered.connect(func_create_batch(t, selected_items))
+                menu.addAction(create_action)
 
         action = menu.exec_(self.list_input_files.mapToGlobal(pos))
 

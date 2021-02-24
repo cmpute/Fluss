@@ -10,6 +10,7 @@ from networkx import DiGraph
 from PySide6.QtCore import QAbstractListModel, QMimeData, QModelIndex, Qt
 from PySide6.QtGui import QBrush, QColor, QDropEvent
 from PySide6.QtWidgets import QLineEdit, QListView, QListWidget
+from typing import List
 
 
 class DirectoryEdit(QLineEdit):
@@ -99,6 +100,15 @@ class TargetListModel(QAbstractListModel):
             self._network.add_edge(tin, target)
         super().endInsertRows()
 
+    def extendTargets(self, targets: List[OrganizeTarget]) -> None:
+        super().beginInsertRows(QModelIndex(), len(self._targets), len(self._targets) + len(targets))
+        self._targets.extend(targets)
+        self._network.add_nodes_from(targets)
+        for target in targets:
+            for tin in target._input:
+                self._network.add_edge(tin, target)
+        super().endInsertRows()
+
     def removeRows(self, row: int, count: int, parent: QModelIndex) -> bool:
         super().beginRemoveRows(parent, row, row + count)
         self._network.remove_nodes_from(self._targets[row:row+count])
@@ -116,7 +126,7 @@ class TargetListModel(QAbstractListModel):
     def setData(self, index: QModelIndex, value: typing.Any, role: int) -> bool:
         if role == Qt.DisplayRole:
             if type(self._targets[index.row()]) == OrganizeTarget:
-                target = CopyTarget([value])
+                target = CopyTarget(value)
                 self._targets[index.row()] = target
                 self._network.add_edge(value, target)
                 return True

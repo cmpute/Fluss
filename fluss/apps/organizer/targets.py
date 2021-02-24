@@ -1,16 +1,30 @@
+from pathlib import Path, PurePath
 from typing import List, Union
-from pathlib import PurePath, Path
 
 from fluss.apps.organizer.edit_copy_target_ui import Ui_CopyTargetDialog
-from fluss.apps.organizer.edit_transcode_text_target_ui import Ui_TranscodeTextTargetDialog
+from fluss.apps.organizer.edit_transcode_text_target_ui import \
+    Ui_TranscodeTextTargetDialog
 from PySide6.QtWidgets import QDialog
-import chardet
+
+
+def _get_icon():
+    from PySide6.QtCore import QSize
+    from PySide6.QtGui import QIcon
+
+    # TODO: find a way to move this to designer file
+    icon = QIcon()
+    icon.addFile(":/icons/main_32", QSize(32, 32))
+    icon.addFile(":/icons/main_16", QSize(16, 16))
+    return icon
 
 class OrganizeTarget:
     description = "Target"
 
     def __init__(self, input_files: List[Union[str, "OrganizeTarget"]]):
-        self._input = input_files
+        if not isinstance(input_files, list):
+            self._input = [input_files]
+        else:
+            self._input = input_files
 
     @classmethod
     def validate(self, input_files: List[Union[str, "OrganizeTarget"]]):
@@ -29,12 +43,12 @@ class CopyTarget(OrganizeTarget):
 
     def __init__(self, input_files):
         super().__init__(input_files)
-        assert len(input_files) == 1, "CopyTarget only accept one input!"
+        assert len(self._input) == 1, "CopyTarget only accept one input!"
 
-        if isinstance(input_files[0], str):
-            self._outname = PurePath(input_files[0]).name
-        elif isinstance(input_files[0], OrganizeTarget):
-            self._outname = input_files[0].output_name
+        if isinstance(self._input[0], str):
+            self._outname = PurePath(self._input[0]).name
+        elif isinstance(self._input[0], OrganizeTarget):
+            self._outname = self._input[0].output_name
         else:
             raise ValueError("Incorrect input type!")
 
@@ -48,6 +62,7 @@ class CopyTarget(OrganizeTarget):
 
     def edit(self, input_root=None, output_root=None):
         dialog = QDialog()
+        dialog.setWindowIcon(_get_icon())
         layout = Ui_CopyTargetDialog()
         layout.setupUi(dialog)
         layout.retranslateUi(dialog)
@@ -62,16 +77,20 @@ class TranscodeTracksTarget(OrganizeTarget):
 class TranscodeTextTarget(OrganizeTarget):
     ''' Support text encoding fixing '''
     description = "Transcode Text"
+    valid_encodings = ['utf-8', 'utf-8-sig', 'gb2312', 'big5', 'gbk', 'shift_jis']
 
     def __init__(self, input_files, encoding="utf-8"):
         super().__init__(input_files)
-        self._encoding = encoding
+        if encoding in self.valid_encodings:
+            self._encoding = encoding
+        else:
+            self._encoding = "utf-8"
         assert len(self._input) == 1, "CopyTarget only accept one input!"
 
-        if isinstance(input_files[0], str):
-            self._outname = PurePath(input_files[0]).name
-        elif isinstance(input_files[0], OrganizeTarget):
-            self._outname = input_files[0].output_name
+        if isinstance(self._input[0], str):
+            self._outname = PurePath(self._input[0]).name
+        elif isinstance(self._input[0], OrganizeTarget):
+            self._outname = self._input[0].output_name
         else:
             raise ValueError("Incorrect input type!")
 
@@ -95,13 +114,20 @@ class TranscodeTextTarget(OrganizeTarget):
         assert isinstance(self._input[0], str), "Only support reading from file by now!"
 
         dialog = QDialog()
+        dialog.setWindowIcon(_get_icon())
         layout = Ui_TranscodeTextTargetDialog()
         layout.setupUi(dialog)
         layout.retranslateUi(dialog)
         layout.txt_outname.setText(self._outname)
-        layout.txt_content.setPlainText((input_root / self._input[0]).read_text(encoding=self._encoding))
+        content = Path(input_root, self._input[0]).read_bytes()
+        layout.txt_content.setPlainText(content.decode(encoding=self._encoding, errors="replace"))
+
+        layout.cbox_encoding.addItems(self.valid_encodings)
+        layout.cbox_encoding.setCurrentText(self._encoding)
+        layout.cbox_encoding.currentTextChanged.connect(lambda text: layout.txt_content.setPlainText(content.decode(encoding=text, errors="replace")))
         if dialog.exec_():
             self._outname = layout.txt_outname.text()
+            self._encoding = layout.cbox_encoding.currentText()
 
 class TranscodePictureTarget(OrganizeTarget):
     ''' Support transcoding '''
