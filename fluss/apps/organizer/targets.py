@@ -1,10 +1,11 @@
 from pathlib import Path, PurePath
 from typing import List, Union
 
-from fluss.apps.organizer.edit_copy_target_ui import Ui_CopyTargetDialog
-from fluss.apps.organizer.edit_transcode_text_target_ui import \
-    Ui_TranscodeTextTargetDialog
 from PySide6.QtWidgets import QDialog
+
+from .edit_copy_target_ui import Ui_CopyTargetDialog
+from .edit_transcode_text_target_ui import Ui_TranscodeTextTargetDialog
+from .edit_transcode_picture_target_ui import Ui_TranscodePictureTargetDialog
 
 
 def _get_icon():
@@ -78,6 +79,7 @@ class TranscodeTextTarget(OrganizeTarget):
     ''' Support text encoding fixing '''
     description = "Transcode Text"
     valid_encodings = ['utf-8', 'utf-8-sig', 'gb2312', 'big5', 'gbk', 'shift_jis']
+    valid_file_types = ['txt', 'log', 'cue']
 
     def __init__(self, input_files, encoding="utf-8"):
         super().__init__(input_files)
@@ -102,7 +104,7 @@ class TranscodeTextTarget(OrganizeTarget):
             suffix = input_files[0].rsplit(".", 1)[1]
         else: # OrganizeTarget
             suffix = input_files[0].output_name.rsplit(".", 1)[1]
-        if suffix not in ['txt', 'log', 'cue']:
+        if suffix not in cls.valid_file_types:
             return False
         return True
 
@@ -131,10 +133,63 @@ class TranscodeTextTarget(OrganizeTarget):
 
 class TranscodePictureTarget(OrganizeTarget):
     ''' Support transcoding '''
-    pass
+    description = "Transcode Image"
+    valid_input_codecs = ['jpg', 'png', 'tif', 'bmp']
+    valid_output_codecs = ['jpg', 'png']
+
+    def __init__(self, input_files, codec=".png"):
+        super().__init__(input_files)
+        if codec in self.valid_output_codecs:
+            self._codec = codec
+        else:
+            self._codec = "png"
+        assert len(self._input) == 1, "CopyTarget only accept one input!"
+
+        if isinstance(self._input[0], str):
+            self._outstem = PurePath(self._input[0]).stem
+        elif isinstance(self._input[0], OrganizeTarget):
+            self._outstem = self._input[0].output_name.rsplit('.', 1)[0]
+        else:
+            raise ValueError("Incorrect input type!")
+        self._quality = .8 # compression rate
+
+    @property
+    def output_name(self):
+        return self._outstem + "." + self._codec
+
+    @classmethod
+    def validate(cls, input_files):
+        if len(input_files) != 1:
+            return False
+        if isinstance(input_files[0], str):
+            suffix = input_files[0].rsplit(".", 1)[1]
+        else: # OrganizeTarget
+            suffix = input_files[0].output_name.rsplit(".", 1)[1]
+        if suffix not in cls.valid_input_codecs:
+            return False
+        return True
+
+    def edit(self, input_root: Path = None, output_root=None):
+        dialog = QDialog()
+        dialog.setWindowIcon(_get_icon())
+        layout = Ui_TranscodePictureTargetDialog()
+        layout.setupUi(dialog)
+        layout.retranslateUi(dialog)
+        layout.txt_outname.setText(self._outstem)
+        layout.cbox_suffix.addItems(['.' + ext for ext in self.valid_output_codecs])
+        layout.cbox_suffix.setCurrentText('.' + self._codec)
+        layout.slider_quality.setValue(int(self._quality * 100))
+        if dialog.exec_():
+            suffix = layout.cbox_suffix.currentText()
+            self._outstem = layout.txt_outname.text()
+            if self._outstem.endswith(suffix):
+                self._outstem = self._outstem[:-len(suffix)]
+            self._codec = suffix[1:]
+            self._quality = layout.slider_quality.value() / 100
 
 class CropPictureTarget:
     ''' Support cover cropping '''
+    description = "Crop Image"
     pass
 
 target_types = [

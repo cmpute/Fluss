@@ -1,17 +1,20 @@
 
 import typing
 from pathlib import Path
+from typing import List
 
-from fluss.apps.organizer.targets import (CopyTarget, OrganizeTarget,
-                                          TranscodePictureTarget,
-                                          TranscodeTextTarget,
-                                          TranscodeTracksTarget)
 from networkx import DiGraph
 from PySide6.QtCore import QAbstractListModel, QMimeData, QModelIndex, Qt
 from PySide6.QtGui import QBrush, QColor, QDropEvent, QResizeEvent
-from PySide6.QtWidgets import QLineEdit, QListView, QListWidget, QWidget, QLabel, QFrame, QApplication
-from typing import List
+from PySide6.QtWidgets import (QApplication, QFrame, QLabel, QLineEdit,
+                               QListView, QListWidget, QWidget)
 
+from .targets import (CopyTarget, OrganizeTarget, TranscodePictureTarget,
+                      TranscodeTextTarget, TranscodeTracksTarget)
+
+USED_COLOR = QBrush(QColor(200, 255, 200, 255))
+PRED_COLOR = QBrush(QColor(255, 200, 200, 255))
+SUCC_COLOR = QBrush(QColor(200, 200, 255, 255))
 
 class DirectoryEdit(QLineEdit):
     def __init__(self, parent) -> None:
@@ -61,6 +64,7 @@ class TargetListModel(QAbstractListModel):
         return len(self._targets)
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole):
+        # TODO: add grey background to files marked as intermediate
         target = self._targets[index.row()]
         if role == Qt.DisplayRole:
             if isinstance(target, CopyTarget):
@@ -70,9 +74,15 @@ class TargetListModel(QAbstractListModel):
             elif isinstance(target, OrganizeTarget):
                 return "(dummy)"
         elif role == Qt.BackgroundRole:
-            if self._states.hovered is not None and \
-                target in self._network.successors(self._states.hovered):
-                return QBrush(QColor(200, 200, 255, 255))
+            if self._states.hovered is not None:
+                if target in self._network.successors(self._states.hovered):
+                    return SUCC_COLOR
+                elif target in self._network.predecessors(self._states.hovered):
+                    return PRED_COLOR
+                elif len(list(self._network.successors(target))):
+                    return USED_COLOR
+                else:
+                    return QBrush()
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         return super().flags(index) | Qt.ItemIsDropEnabled
@@ -113,6 +123,7 @@ class TargetListModel(QAbstractListModel):
         super().beginRemoveRows(parent, row, row + count)
         self._network.remove_nodes_from(self._targets[row:row+count])
         self._targets[row:row + count] = []
+        # TODO: also prompt and remove successor targets
         super().endRemoveRows()
         return True
 
