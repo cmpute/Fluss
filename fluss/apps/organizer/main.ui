@@ -16,7 +16,7 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_4" stretch="1,0">
     <item>
-     <widget class="QSplitter" name="splitter_2">
+     <widget class="QSplitter" name="splitter_io">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
@@ -64,9 +64,12 @@
         </item>
        </layout>
       </widget>
-      <widget class="QSplitter" name="splitter">
+      <widget class="QSplitter" name="splitter_album">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
+       </property>
+       <property name="handleWidth">
+        <number>5</number>
        </property>
        <widget class="QWidget" name="verticalLayoutWidget_3">
         <layout class="QVBoxLayout" name="panel_output" stretch="0,0,1">
@@ -190,62 +193,175 @@
          </item>
         </layout>
        </widget>
-       <widget class="QWidget" name="horizontalLayoutWidget">
-        <layout class="QHBoxLayout" name="panel_folders" stretch="0,0">
+       <widget class="QWidget" name="verticalLayoutWidget_4">
+        <layout class="QVBoxLayout" name="panel_discs" stretch="1,0">
          <item>
-          <widget class="QTabWidget" name="tab_folders">
-           <property name="toolTip">
-            <string>Each tab corresponds to a subfolder of output</string>
-           </property>
-           <property name="currentIndex">
-            <number>-1</number>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <layout class="QVBoxLayout" name="verticalLayout">
+          <layout class="QHBoxLayout" name="panel_folders" stretch="1,0">
            <item>
-            <widget class="QComboBox" name="txt_folder_name">
-             <property name="editable">
-              <bool>true</bool>
+            <widget class="QTabWidget" name="tab_folders">
+             <property name="toolTip">
+              <string>Each tab corresponds to a subfolder of output</string>
+             </property>
+             <property name="currentIndex">
+              <number>-1</number>
              </property>
             </widget>
            </item>
            <item>
-            <widget class="QPushButton" name="btn_add_folder">
-             <property name="text">
-              <string>Add Folder</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="btn_del_folder">
-             <property name="text">
-              <string>Delete Folder</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="btn_add_output">
-             <property name="text">
-              <string>Add Output</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <spacer name="verticalSpacer_2">
-             <property name="orientation">
-              <enum>Qt::Vertical</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>20</width>
-               <height>40</height>
-              </size>
-             </property>
-            </spacer>
+            <layout class="QVBoxLayout" name="verticalLayout">
+             <item>
+              <widget class="QComboBox" name="txt_folder_name">
+               <property name="editable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btn_add_folder">
+               <property name="text">
+                <string>Add Folder</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btn_del_folder">
+               <property name="text">
+                <string>Delete Folder</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btn_add_output">
+               <property name="text">
+                <string>Add Output</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btn_expand_meta">
+               <property name="text">
+                <string>Expand Meta</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="verticalSpacer_2">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
            </item>
           </layout>
+         </item>
+         <item>
+          <widget class="QWidget" name="panel_folder_meta" native="true">
+           <layout class="QGridLayout" name="gridLayout_1">
+            <item row="0" column="3">
+             <widget class="QLineEdit" name="txt_partnumber"/>
+            </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="txt_source"/>
+            </item>
+            <item row="1" column="2">
+             <widget class="QLabel" name="label_11">
+              <property name="text">
+               <string>Tool</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="2">
+             <widget class="QLabel" name="label_14">
+              <property name="text">
+               <string>Ripper</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="label_9">
+              <property name="text">
+               <string>Edition</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="3">
+             <widget class="QLineEdit" name="txt_tool"/>
+            </item>
+            <item row="1" column="1">
+             <widget class="QLineEdit" name="txt_edition"/>
+            </item>
+            <item row="3" column="1" colspan="3">
+             <widget class="QLabel" name="label_db">
+              <property name="text">
+               <string>Database</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="0">
+             <widget class="QToolButton" name="tbtn_expand_db">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="layoutDirection">
+               <enum>Qt::LeftToRight</enum>
+              </property>
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="2">
+             <widget class="QLabel" name="label_10">
+              <property name="toolTip">
+               <string>Part Number</string>
+              </property>
+              <property name="text">
+               <string>P/N</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="3">
+             <widget class="QLineEdit" name="txt_ripper"/>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="label_13">
+              <property name="text">
+               <string>Source</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QLineEdit" name="txt_catalog"/>
+            </item>
+            <item row="0" column="0">
+             <widget class="QLabel" name="label_12">
+              <property name="text">
+               <string>Catalog</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="4" rowspan="3">
+             <widget class="QPlainTextEdit" name="txt_comment"/>
+            </item>
+            <item row="0" column="4">
+             <widget class="QLabel" name="label_16">
+              <property name="text">
+               <string>Comment:</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
          </item>
         </layout>
        </widget>

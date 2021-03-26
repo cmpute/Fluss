@@ -1,4 +1,5 @@
-# addict
+addict
 mutagen
 chardet
 networkx
+parse

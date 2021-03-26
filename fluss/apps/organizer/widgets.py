@@ -9,7 +9,7 @@ from PySide6.QtGui import QBrush, QColor, QDropEvent, QResizeEvent
 from PySide6.QtWidgets import (QApplication, QFrame, QLabel, QLineEdit,
                                QListView, QListWidget, QWidget)
 
-from .targets import (CopyTarget, OrganizeTarget, TranscodePictureTarget,
+from .targets import (CopyTarget, ConvertTracksTarget, OrganizeTarget, TranscodePictureTarget,
                       TranscodeTextTarget, TranscodeTracksTarget)
 
 USED_COLOR = QBrush(QColor(200, 255, 200, 255))
@@ -71,6 +71,8 @@ class TargetListModel(QAbstractListModel):
             if isinstance(target, CopyTarget):
                 return prefix + target.output_name + " (copy)"
             elif isinstance(target, (TranscodeTextTarget, TranscodePictureTarget)):
+                return prefix + target.output_name + " (recode)"
+            elif isinstance(target, ConvertTracksTarget):
                 return prefix + target.output_name + " (convert)"
             elif isinstance(target, OrganizeTarget):
                 return "(dummy)"

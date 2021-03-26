@@ -3,5 +3,5 @@
 - `pyside6-rcc fluss\apps\organizer\main.qrc -o fluss\apps\organizer\main_rc.py`
 - `pyside6-uic fluss\apps\organizer\edit_transcode_text_target.ui -o fluss\apps\organizer\edit_transcode_text_target_ui.py`
 - `pyside6-uic fluss\apps\organizer\edit_copy_target.ui -o fluss\apps\organizer\edit_copy_target_ui.py`
-- `pyside6-uic fluss\apps\organizer\edit_transcode_tracks.ui -o fluss\apps\organizer\edit_transcode_tracks_ui.py`
-- `pyside6-uic fluss\apps\organizer\edit_transcode_picture_target.ui -o fluss\apps\organizer\edit_transcode_picture_target_ui.py`
+- `pyside6-uic fluss\apps\organizer\edit_convert_tracks.ui -o fluss\apps\organizer\edit_convert_tracks_ui.py`
+- `pyside6-uic fluss\apps\organizer\edit_transcode_target.ui -o fluss\apps\organizer\edit_transcode_target_ui.py`

@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>TranscodePictureTargetDialog</class>
- <widget class="QDialog" name="TranscodePictureTargetDialog">
+ <class>TranscodeTargetDialog</class>
+ <widget class="QDialog" name="TranscodeTargetDialog">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
     <width>524</width>
-    <height>97</height>
+    <height>71</height>
    </rect>
   </property>
   <property name="maximumSize">
@@ -17,7 +17,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>Edit picture transcoding target properties</string>
+   <string>Edit transcoding target properties</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -38,30 +38,6 @@
     </layout>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item>
-      <widget class="QLabel" name="label_2">
-       <property name="text">
-        <string>Quality</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSlider" name="slider_quality">
-       <property name="minimum">
-        <number>1</number>
-       </property>
-       <property name="maximum">
-        <number>100</number>
-       </property>
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
@@ -78,7 +54,7 @@
   <connection>
    <sender>buttonBox</sender>
    <signal>accepted()</signal>
-   <receiver>TranscodePictureTargetDialog</receiver>
+   <receiver>TranscodeTargetDialog</receiver>
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
@@ -94,7 +70,7 @@
   <connection>
    <sender>buttonBox</sender>
    <signal>rejected()</signal>
-   <receiver>TranscodePictureTargetDialog</receiver>
+   <receiver>TranscodeTargetDialog</receiver>
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">

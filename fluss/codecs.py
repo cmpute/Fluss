@@ -11,7 +11,11 @@ import mutagen.flac
 import mutagen.wavpack
 import mutagen.apev2
 
-class Codec:
+class AudioCodec:
+    suffix: str
+    ''' output suffix of files with this codec
+    '''
+
     def __init__(self, encode_args=None):
         '''
         encode_args: (extra) command line args for encoding, usually for adjusting compression level
@@ -39,7 +43,9 @@ class Codec:
         else:
             return f"{self.__class__.__name__} (default)"
 
-class flac(Codec):
+class flac(AudioCodec):
+    suffix = "flac"
+
     def __init__(self, encode_args=None):
         super().__init__(encode_args)
         assert Path(C.path.flac).exists()
@@ -56,7 +62,9 @@ class flac(Codec):
     def mutagen(self, fin: str) -> mutagen.flac.FLAC:
         return mutagen.flac.FLAC(fin)
 
-class wavpack(Codec):
+class wavpack(AudioCodec):
+    suffix = "wv"
+
     def __init__(self, encode_args=None):
         super().__init__(encode_args)
         assert Path(C.path.wavpack).exists()
@@ -74,11 +82,13 @@ class wavpack(Codec):
     def mutagen(self, fin: str) -> mutagen.wavpack.WavPack:
         return mutagen.wavpack.WavPack(fin)
 
-def codec_from_filename(filename: str) -> Type[Codec]:
-    codec_map = {
-        ".wv": wavpack,
-        ".flac": flac
-    }
+codec_from_name = {
+    'wavpack': wavpack,
+    'flac': flac,
+}
+
+def codec_from_filename(filename: str) -> Type[AudioCodec]:
+    codec_map = {c.suffix: cls for c, cls in codec_from_name.items()}
     return codec_map[Path(filename).suffix]
 
 def merge_streams(streams: List[Union[wave.Wave_read, float]], fout: io.RawIOBase) -> None:

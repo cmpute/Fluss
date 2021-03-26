@@ -4,6 +4,7 @@ from pathlib import Path
 
 from addict import Dict as edict
 from fluss.config import global_config
+from fluss.meta import AlbumMeta, FolderMeta
 from networkx import DiGraph
 from PySide6.QtCore import QModelIndex, QPoint, QSize, Qt, QUrl, Signal
 from PySide6.QtGui import (QAction, QBrush, QColor, QContextMenuEvent,
@@ -29,11 +30,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._network = DiGraph() # explicit targets dependencies
         self._shared_states = edict(hovered=None)
         self._enable_cross_selection = False
+        self._meta = None
+        self._last_tab_index = None
 
         self.setupUi(self)
         self.retranslateUi(self)
         self.setupSignals()
-        self.addOutputFolder("CD")
+        # self.addOutputFolder("CD")
 
         # load resources
         self.setWindowIcon(_get_icon())
@@ -41,6 +44,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cbox_output_type.addItem(format)
 
         # TODO: For debug
+        self.txt_input_path.setText(r"C:\Users\cmput\Music\Sennzai - Tødestrieb")
 
     def setupSignals(self):
         self.btn_input_browse.clicked.connect(self.browseInput)
@@ -55,6 +59,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.list_input_files.itemEntered.connect(self.updateHighlightInput)
         self.list_input_files.leaveEvent = self.listInputViewLeave
         self.list_input_files.customContextMenuRequested.connect(self.inputContextMenu)
+        self.panel_folder_meta.setVisible(False)
+        self.btn_expand_meta.clicked.connect(lambda: (
+            self.panel_folder_meta.setVisible(not self.panel_folder_meta.isVisible()),
+            self.btn_expand_meta.setText("Fold Meta" if self.panel_folder_meta.isVisible() else "Expand Meta")
+        ))
+        self.tab_folders.currentChanged.connect(self.updateSelectedFolder)
 
     def listInputViewLeave(self, event):
         self._shared_states.hovered = None
@@ -80,6 +90,33 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.refreshInputBgcolor()
         self.refreshOutputBgcolor()
 
+    def updateSelectedFolder(self, index: int):
+        if self.tab_folders.count() == 0: # happens when reset
+            return
+
+        if self._last_tab_index is not None:
+            self.flushFolderMeta(self._last_tab_index)
+        self._last_tab_index = index
+
+        current_meta = self._meta.folders[self.tab_folders.tabText(index)]
+        self.txt_catalog.setText(current_meta.catalog)
+        self.txt_partnumber.setText(current_meta.partnumber)
+        self.txt_edition.setText(current_meta.edition)
+        self.txt_tool.setText(current_meta.tool)
+        self.txt_source.setText(current_meta.source)
+        self.txt_ripper.setText(current_meta.ripper)
+        self.txt_comment.setPlainText(current_meta.comment)
+
+    def flushFolderMeta(self, index: int):
+        target_meta = self._meta.folders[self.tab_folders.tabText(index)]
+        target_meta.catalog = self.txt_catalog.text()
+        target_meta.partnumber = self.txt_partnumber.text()
+        target_meta.edition = self.txt_edition.text()
+        target_meta.tool = self.txt_tool.text()
+        target_meta.source = self.txt_source.text()
+        target_meta.ripper = self.txt_ripper.text()
+        target_meta.comment = self.txt_comment.toPlainText()
+
     def listOutputViewLeave(self, event):
         self._shared_states.hovered = None
         self.refreshInputBgcolor()
@@ -98,11 +135,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         listview.setContextMenuPolicy(Qt.CustomContextMenu)
         listview.customContextMenuRequested.connect(lambda pos: self.outputContextMenu(listview, pos))
 
+        self._meta.folders[name] = FolderMeta()
         self.tab_folders.addTab(listview, name.upper())
 
         self.updateFolderNames()
 
     def removeOutputFolder(self):
+        self._meta.folders.pop(self.tab_folders.tabText(self.tab_folders.currentIndex()))
         self.tab_folders.removeTab(self.tab_folders.currentIndex())
         self.updateFolderNames()
 
@@ -234,8 +273,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         menu.exec_(listview.mapToGlobal(pos))
 
     def inputChanged(self, content):
-        path = Path(content).resolve()
-        
+        path = Path(content)
+
         if not (content and path.exists()):
             return
         if self._input_folder == path:
@@ -289,14 +328,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.widget_keywords.extendKeywords(keywords)
 
     def reset(self):
+        self.list_input_files.clear()
+        self.widget_keywords.clear()
+        self.tab_folders.clear()
+
         self._input_folder = None
         self._shared_states.hovered = None
         self._network.clear()
-        self.list_input_files.clear()
-        self.widget_keywords.clear()
-        for i in range(self.tab_folders.count()):
-            model = (self.tab_folders.widget(i)).model()
-            model.removeRows(0, len(model), QModelIndex())
+        self._meta = AlbumMeta()
+        self._last_tab_index = None
+
+        self.addOutputFolder("CD")
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         super().keyPressEvent(event)

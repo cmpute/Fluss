@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import List, Set
+from typing import List, Set, Dict
 import mutagen
 from mutagen.flac import FLAC
 from mutagen.apev2 import APEv2File
@@ -41,16 +41,18 @@ class DiscMeta:
     genre: str
     date: str
     tracks: List[TrackMeta]
-    _cuesheet: Cuesheet
     cover: bytes
 
+    _cuesheet: Cuesheet
+
     def __init__(self) -> None:
+        self._cuesheet = None
+
         self.title = None
         self.artists = set()
         self.genre = None
         self.date = None
         self.tracks = list()
-        self._cuesheet = None
         self.cover = None
 
     def _reserve_tracks(self, track_idx):
@@ -247,5 +249,28 @@ class DiscMeta:
 
         return gen
 
+class FolderMeta:
+    catalog: str
+    partnumber: str
+    edition: str
+    tool: str
+    source: str
+    ripper: str
+    comment: str
+    database: dict
+
+    def __init__(self):
+        self.catalog = None
+        self.partnumber = None
+        self.edition = None
+        self.tool = None
+        self.source = None
+        self.ripper = None
+        self.comment = None
+        self.database = dict()
+
 class AlbumMeta: # corresponds to meta.yaml
-    pass
+    folders: Dict[str, FolderMeta]
+
+    def __init__(self):
+        self.folders = dict()
