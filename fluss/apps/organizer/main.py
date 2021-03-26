@@ -210,18 +210,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         action = menu.exec_(self.list_input_files.mapToGlobal(pos))
 
     def outputContextMenu(self, listview: QListView, pos: QPoint):
+        current_model = listview.model()
         menu = QMenu()
-        edit_action = QAction("Edit", menu)
-        edit_action.triggered.connect(lambda: listview.model()[listview.currentIndex().row()].edit(
+        edit_action = QAction("Edit clicked" if len(listview.selectedIndexes()) > 1 else "Edit", menu)
+        edit_action.triggered.connect(lambda: current_model[listview.currentIndex().row()].edit(
             input_root=self.txt_input_path.text(),
             output_root=Path(self.txt_output_path.text(), self.tab_folders.tabText(self.tab_folders.currentIndex()))
         ))
         menu.addAction(edit_action)
         delete_action = QAction("Remove", menu)
-        delete_action.triggered.connect(lambda: listview.model().__delitem__(
+        delete_action.triggered.connect(lambda: current_model.__delitem__(
             [i.row() for i in listview.selectedIndexes()]
         ))
         menu.addAction(delete_action)
+        mark_temp_action = QAction("Mark temp", menu)
+        mark_temp_action.setCheckable(True)
+        mark_temp_action.setChecked(current_model[listview.currentIndex().row()].temporary)
+        mark_temp_action.triggered.connect(lambda: [current_model[i.row()].switch_temporary()
+            for i in listview.selectedIndexes()])
+        menu.addAction(mark_temp_action)
 
         self.addTargetActions(menu)
         menu.exec_(listview.mapToGlobal(pos))

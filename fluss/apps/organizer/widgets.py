@@ -67,10 +67,11 @@ class TargetListModel(QAbstractListModel):
         # TODO: add grey background to files marked as intermediate
         target = self._targets[index.row()]
         if role == Qt.DisplayRole:
+            prefix = '*' if target.temporary else ''
             if isinstance(target, CopyTarget):
-                return target.output_name + " (copy)"
+                return prefix + target.output_name + " (copy)"
             elif isinstance(target, (TranscodeTextTarget, TranscodePictureTarget)):
-                return target.output_name + " (convert)"
+                return prefix + target.output_name + " (convert)"
             elif isinstance(target, OrganizeTarget):
                 return "(dummy)"
         elif role == Qt.BackgroundRole:

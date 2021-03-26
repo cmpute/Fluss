@@ -1,11 +1,14 @@
 from pathlib import Path, PurePath
 from typing import List, Union
+from io import BytesIO
 
 from PySide6.QtWidgets import QDialog
 
 from .edit_copy_target_ui import Ui_CopyTargetDialog
 from .edit_transcode_text_target_ui import Ui_TranscodeTextTargetDialog
 from .edit_transcode_picture_target_ui import Ui_TranscodePictureTargetDialog
+from .edit_convert_tracks_ui import Ui_ConvertTracksTargetDialog
+from fluss.config import global_config
 
 
 def _get_icon():
@@ -26,6 +29,10 @@ class OrganizeTarget:
             self._input = [input_files]
         else:
             self._input = input_files
+        self.temporary = False
+
+    def switch_temporary(self):
+        self.temporary = not self.temporary
 
     @classmethod
     def validate(self, input_files: List[Union[str, "OrganizeTarget"]]):
@@ -33,11 +40,40 @@ class OrganizeTarget:
 
     @property
     def output_name(self):
+        ''' output file name'''
         raise NotImplementedError("Abstract property!")
 
     def edit(self, input_root: Path = None, output_root: Path = None):
-        # open edit dialog
+        ''' open edit dialog
+        '''
         raise NotImplementedError("Abstract property!")
+
+    def apply(self, input_root: Path = None, output_root: Path = None):
+        ''' execute target
+        input_root is used when input is str
+        output_root is used when this target is not marked as temporary
+        # TODO: add functionality to mark a target as temporary
+        Should return the path to result file
+        '''
+        raise NotImplementedError("Abstract property!")
+
+    def apply_stream(self, input_root: Path = None) -> BytesIO:
+        ''' execute target to BytesIO
+        Should return the generated binary data
+        '''
+        raise NotImplementedError("Abstract property!")
+
+
+def _split_name(target: Union[str, OrganizeTarget]):
+    if isinstance(target, str):
+        name = target
+    else: # OrganizeTarget
+        name = target.output_name
+    split = name.rsplit(".", 1)
+    if len(split) == 1:
+        return split[0], ""
+    else:
+        return split
 
 class CopyTarget(OrganizeTarget):    
     description = "Copy"
@@ -72,8 +108,38 @@ class CopyTarget(OrganizeTarget):
             self._outname = layout.txt_outname.text()
 
 class TranscodeTracksTarget(OrganizeTarget):
-    ''' Support recoding, merging, embedding cue and embedding cover '''
+    ''' Support recoding single audio files '''
     description = "Transcode Tracks"
+    # TODO: implement track conversion (This is useful for DSD)
+
+class ConvertTracksTarget(OrganizeTarget):
+    ''' Support recoding, merging, embedding cue and embedding cover '''
+    description = "Convert Tracks"
+
+    def __init__(self, input_files, codec=global_config.organizer.output_codec.audio, split_tracks=False):
+        super().__init__(input_files)
+
+    @classmethod
+    def validate(cls, input_files):
+        # TODO: implement validation, only allow 1 cover, 1 cue, n audio files
+        return True
+
+    @property
+    def output_name(self):
+        return "N/A"
+
+    def edit(self, input_root=None, output_root=None):
+        dialog = QDialog()
+        dialog.setWindowIcon(_get_icon())
+        layout = Ui_ConvertTracksTargetDialog()
+        layout.setupUi(dialog)
+        layout.retranslateUi(dialog)
+        layout.widget_databases.setVisible(False)
+        layout.tbtn_expand.clicked.connect(lambda: layout.widget_databases.setVisible(not layout.widget_databases.isVisible()))
+        # TODO: collect cuesheet items from file into the table, need track number, editable track name, start time, end time, track artist
+        if dialog.exec_():
+            # TODO: update the infomation from dialog
+            print("OK")
 
 class TranscodeTextTarget(OrganizeTarget):
     ''' Support text encoding fixing '''
@@ -100,10 +166,7 @@ class TranscodeTextTarget(OrganizeTarget):
     def validate(cls, input_files):
         if len(input_files) != 1:
             return False
-        if isinstance(input_files[0], str):
-            suffix = input_files[0].rsplit(".", 1)[1]
-        else: # OrganizeTarget
-            suffix = input_files[0].output_name.rsplit(".", 1)[1]
+        suffix = _split_name(input_files[0])[1]
         if suffix not in cls.valid_file_types:
             return False
         return True
@@ -161,10 +224,7 @@ class TranscodePictureTarget(OrganizeTarget):
     def validate(cls, input_files):
         if len(input_files) != 1:
             return False
-        if isinstance(input_files[0], str):
-            suffix = input_files[0].rsplit(".", 1)[1]
-        else: # OrganizeTarget
-            suffix = input_files[0].output_name.rsplit(".", 1)[1]
+        suffix = _split_name(input_files[0])[1]
         if suffix not in cls.valid_input_codecs:
             return False
         return True
@@ -187,14 +247,17 @@ class TranscodePictureTarget(OrganizeTarget):
             self._codec = suffix[1:]
             self._quality = layout.slider_quality.value() / 100
 
-class CropPictureTarget:
+class CropPictureTarget(OrganizeTarget):
     ''' Support cover cropping '''
     description = "Crop Image"
-    pass
+
+    # TODO: support this
 
 target_types = [
     CopyTarget,
+    CropPictureTarget,
+    ConvertTracksTarget,
     TranscodeTracksTarget,
     TranscodeTextTarget,
-    TranscodePictureTarget
+    TranscodePictureTarget,
 ]
