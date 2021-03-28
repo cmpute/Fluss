@@ -2,8 +2,8 @@ from collections import defaultdict
 from typing import List, Set, Dict
 import mutagen
 from mutagen.flac import FLAC
-from mutagen.apev2 import APEv2File
-from mutagen.id3 import ID3, PictureType
+from mutagen.apev2 import APEv2, APEv2File
+from mutagen.id3 import ID3, ID3FileType, PictureType
 from fluss.cuesheet import Cuesheet, CuesheetTrack, _default_cuesheet_file
 
 def assert_field(v1, v2, field_name):
@@ -20,17 +20,67 @@ class TrackMeta:
         self.title = None
         self.artists = set()
 
+    def __str__(self) -> str:
+        return f'''Track Metadata
+\ttitle: {self.title}
+\tartists: {self.full_artist}'''
+
     @property
     def full_artist(self) -> str:
         return ', '.join(self.artists) if self.artists else None
 
     def update(self, meta: "TrackMeta", overwrite: bool = True):
+        if meta is None:
+            return
+
         for key in ['title']:
             new_value = getattr(meta, key, None)
             old_value = getattr(self, key, None)
             if (overwrite and new_value) or (not overwrite and not old_value):
                 setattr(self, key, new_value)
         self.artists.update(meta.artists)
+
+    @classmethod
+    def from_flac(cls, flac_meta: FLAC) -> "TrackMeta":
+        cur_track = TrackMeta()
+        cur_updated = False
+        if 'TITLE' in flac_meta.tags:
+            cur_track.title = flac_meta.tags['TITLE'][0]
+            cur_updated = True
+        if 'ARTIST' in flac_meta:
+            cur_track.artists.update(a for a in flac_meta.tags.get('ARTIST') if a)
+            cur_updated = True
+
+        return cur_track if cur_updated else None
+        
+    @classmethod
+    def from_ape(cls, ape_meta: APEv2File) -> "TrackMeta":
+        '''
+        Create metadata from media with APEv2 tags
+        '''
+        raise NotImplementedError()
+
+    @classmethod
+    def from_id3(cls, id3_meta: ID3) -> "TrackMeta":
+        '''
+        Create metadata from media with ID3v2 tags
+        '''
+        raise NotImplementedError("Parse metadata from ID3 tag is not implemented!")
+
+    @classmethod
+    def from_mutagen(cls, mutagen_file: mutagen.FileType) -> "DiscMeta":
+        '''
+        Create metadata from mutagen file
+        track_mode: regard the file as single track
+        '''
+        if isinstance(mutagen_file, FLAC):
+            return cls.from_flac(mutagen_file)
+        elif isinstance(mutagen_file, APEv2File):
+            return cls.from_ape(mutagen_file)
+        elif isinstance(mutagen_file, ID3):
+            return cls.from_id3(mutagen_file)
+        else:
+            raise ValueError("Unsupported mutagen format!")
 
 class DiscMeta:
     '''
@@ -55,12 +105,22 @@ class DiscMeta:
         self.tracks = list()
         self.cover = None
 
+    def __str__(self) -> str:
+        str_tracks = [f"\n\t{i:02} " + str(t).replace("\n", "\n\t") for i, t in enumerate(self.tracks)] # indent
+        return f'''Disc Metadata
+\ttitle: {self.title}
+\tartists: {self.full_artist}
+\tgenre: {self.genre}
+\tdate: {self.date}
+\ttracks: {''.join(str_tracks)}
+\tcover: {not (self.cover is None)}'''
+
     def _reserve_tracks(self, track_idx):
         if track_idx > len(self.tracks):
             for _ in range(len(self.tracks), track_idx):
-                self.tracks.append(TrackMeta())
+                self.tracks.append(None)
 
-    def update(self, meta: "DiscMeta", overwrite: bool = True):
+    def update(self, meta: "DiscMeta", overwrite: bool = True) -> None:
         '''
         Update information from :attr:`meta` input. This function acts like :func:`dict.update()`
 
@@ -81,11 +141,17 @@ class DiscMeta:
 
         # update tracks
         self._reserve_tracks(len(meta.tracks))
-        for track, new_track in zip(self.tracks, meta.tracks):
-            track.update(new_track, overwrite=overwrite)
+        for i, new_track in zip(range(len(self.tracks)), meta.tracks):
+            self.update_track(i, new_track, overwrite=overwrite)
+
+    def update_track(self, index: int, meta: TrackMeta, overwrite: bool = True):
+        if self.tracks[index]:
+            self.tracks[index].update(meta, overwrite=overwrite)
+        else:
+            self.tracks[index] = meta
 
     @classmethod
-    def from_flac(cls, flac_meta: FLAC):
+    def from_flac(cls, flac_meta: FLAC) -> "DiscMeta":
         '''
         Create metadata from FLAC file
         '''
@@ -101,14 +167,17 @@ class DiscMeta:
             meta.artists.update((a for a in flac_meta.tags.get('ALBUMARTIST') if a))
         if get_first('DATE'):
             meta.date = get_first('DATE')
-        track_idx = int(get_first('TRACKNUMBER'))
-        if track_idx: # This is an flac for single track
-            meta._reserve_tracks(track_idx)
-            cur_track = meta.tracks[track_idx-1]
-            if get_first('TITLE'):
-                cur_track.title = get_first('TITLE')
-            if 'ARTIST' in flac_meta:
-                cur_track.artists.update((a for a in flac_meta.tags.get('ARTIST') if a))
+        track_idx_str = get_first('TRACKNUMBER')
+        if track_idx_str: # This is an flac for single track
+            if '/' in track_idx_str:
+                idx_str, total_str = track_idx_str.rsplit('/')
+                track_idx = int(idx_str)
+                reserved_idx = int(total_str)
+            else:
+                track_idx = int(track_idx_str)
+                reserved_idx = track_idx
+            meta._reserve_tracks(reserved_idx)
+            meta.tracks[track_idx-1] = TrackMeta.from_flac(flac_meta)
 
         if flac_meta.cuesheet:
             meta._cuesheet = Cuesheet.from_flac(flac_meta.cuesheet)
@@ -122,22 +191,25 @@ class DiscMeta:
 
         return meta
 
-    def from_ape(self, ape_meta: APEv2File):
+    @classmethod
+    def from_ape(cls, ape_meta: APEv2File) -> "DiscMeta":
         '''
         Create metadata from media with APEv2 tags
         '''
         pass
 
-    def from_id3(self, id3_meta: ID3):
+    @classmethod
+    def from_id3(cls, id3_meta: ID3) -> "DiscMeta":
         '''
         Create metadata from media with ID3v2 tags
         '''
         raise NotImplementedError("Parse metadata from ID3 tag is not implemented!")
 
     @classmethod
-    def from_mutagen(cls, mutagen_file: mutagen.FileType):
+    def from_mutagen(cls, mutagen_file: mutagen.FileType) -> "DiscMeta":
         '''
         Create metadata from mutagen file
+        track_mode: regard the file as single track
         '''
         if isinstance(mutagen_file, FLAC):
             return cls.from_flac(mutagen_file)
@@ -149,7 +221,7 @@ class DiscMeta:
             raise ValueError("Unsupported mutagen format!")
 
     @classmethod
-    def from_cuesheet(cls, cuesheet: Cuesheet):
+    def from_cuesheet(cls, cuesheet: Cuesheet) -> "DiscMeta":
         '''
         Create metadata from cuesheet
         '''
@@ -172,7 +244,7 @@ class DiscMeta:
         return self._cuesheet
 
     @cuesheet.setter
-    def cuesheet(self, value: Cuesheet):
+    def cuesheet(self, value: Cuesheet) -> None:
         # check consistency between metadata and cuesheet
         assert_field(value.title, self.title, "album title")
         assert_field(value.performer, self.full_artist, "album artist")

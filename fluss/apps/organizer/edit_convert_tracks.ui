@@ -24,7 +24,11 @@
       </widget>
      </item>
      <item>
-      <widget class="QLineEdit" name="txt_album_title"/>
+      <widget class="QLineEdit" name="txt_album_title">
+       <property name="placeholderText">
+        <string>&lt;Inherited&gt;</string>
+       </property>
+      </widget>
      </item>
      <item>
       <widget class="QLabel" name="label_10">
@@ -37,6 +41,9 @@
       <widget class="QLineEdit" name="txt_album_artists">
        <property name="toolTip">
         <string>Split the name of multiple artists by &quot;; &quot;</string>
+       </property>
+       <property name="placeholderText">
+        <string>&lt;Inherited&gt;</string>
        </property>
       </widget>
      </item>
@@ -76,7 +83,23 @@
     </widget>
    </item>
    <item>
-    <widget class="QTableWidget" name="tableWidget"/>
+    <widget class="QTableView" name="table_tracks">
+     <property name="acceptDrops">
+      <bool>true</bool>
+     </property>
+     <property name="dragDropOverwriteMode">
+      <bool>false</bool>
+     </property>
+     <property name="dragDropMode">
+      <enum>QAbstractItemView::InternalMove</enum>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+     <attribute name="horizontalHeaderStretchLastSection">
+      <bool>true</bool>
+     </attribute>
+    </widget>
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="0,1,0,0,0">

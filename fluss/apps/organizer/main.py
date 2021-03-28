@@ -16,8 +16,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog,
 
 from . import main_rc
 from .main_ui import Ui_MainWindow
-from .targets import _get_icon, target_types
-from .widgets import TargetListModel, PRED_COLOR, USED_COLOR
+from .targets import target_types
+from .widgets import _get_icon, TargetListModel, PRED_COLOR, USED_COLOR, editTarget
 
 # TODO: add help (as below)
 # - you can drag file from input to output by pressing alt
@@ -252,10 +252,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         current_model = listview.model()
         menu = QMenu()
         edit_action = QAction("Edit clicked" if len(listview.selectedIndexes()) > 1 else "Edit", menu)
-        edit_action.triggered.connect(lambda: current_model[listview.currentIndex().row()].edit(
-            input_root=self.txt_input_path.text(),
+        edit_action.triggered.connect(lambda: editTarget(
+            current_model[listview.currentIndex().row()],
+            input_root=Path(self.txt_input_path.text()),
             output_root=Path(self.txt_output_path.text(), self.tab_folders.tabText(self.tab_folders.currentIndex()))
         ))
+        # TODO: trigger update of the overall metadata if not filled
         menu.addAction(edit_action)
         delete_action = QAction("Remove", menu)
         delete_action.triggered.connect(lambda: current_model.__delitem__(

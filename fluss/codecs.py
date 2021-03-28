@@ -19,7 +19,6 @@ class AudioCodec:
     def __init__(self, encode_args=None):
         '''
         encode_args: (extra) command line args for encoding, usually for adjusting compression level
-        TODO: if encode_args = None, read encode_args from config
         '''
         if encode_args is None:
             self.encode_args = []
@@ -34,7 +33,8 @@ class AudioCodec:
     def decode(self, fin: str) -> wave.Wave_read:
         raise NotImplementedError("Abstract function!")
 
-    def mutagen(self, fin: str) -> mutagen.FileType:
+    @classmethod
+    def mutagen(cls, fin: str) -> mutagen.FileType:
         raise NotImplementedError("Abstract function!")
 
     def __str__(self):
@@ -59,7 +59,8 @@ class flac(AudioCodec):
         outs, _ = proc.communicate()
         return wave.open(io.BytesIO(outs), "rb")
 
-    def mutagen(self, fin: str) -> mutagen.flac.FLAC:
+    @classmethod
+    def mutagen(cls, fin: str) -> mutagen.flac.FLAC:
         return mutagen.flac.FLAC(fin)
 
 class wavpack(AudioCodec):
@@ -79,7 +80,8 @@ class wavpack(AudioCodec):
         outs, _ = proc.communicate()
         return wave.open(io.BytesIO(outs), "rb")
 
-    def mutagen(self, fin: str) -> mutagen.wavpack.WavPack:
+    @classmethod
+    def mutagen(cls, fin: str) -> mutagen.wavpack.WavPack:
         return mutagen.wavpack.WavPack(fin)
 
 codec_from_name = {
@@ -88,7 +90,7 @@ codec_from_name = {
 }
 
 def codec_from_filename(filename: str) -> Type[AudioCodec]:
-    codec_map = {c.suffix: cls for c, cls in codec_from_name.items()}
+    codec_map = {('.' + c.suffix): c for c in codec_from_name.values()}
     return codec_map[Path(filename).suffix]
 
 def merge_streams(streams: List[Union[wave.Wave_read, float]], fout: io.RawIOBase) -> None:

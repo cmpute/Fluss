@@ -5,7 +5,7 @@ from os import linesep
 
 import chardet
 from chardet.enums import LanguageFilter
-from mutagen import flac
+from mutagen import flac, Tags
 
 
 def _parse_index_point(timestr: str) -> int:
@@ -140,6 +140,23 @@ class Cuesheet:
                 elif index.index_number == 1:
                     cue.files[file][track.track_number].index01 += track.start_offset + index.index_offset
         return cue
+
+    @classmethod
+    def from_mutagen(cls, tag: Union[flac.FLAC, Tags]) -> "Cuesheet":
+        if isinstance(tag, flac.FLAC):
+            if tag.cuesheet:
+                return cls.from_flac(tag.cuesheet)
+            else:
+                return None
+        elif isinstance(tag, (Tags)):
+            if 'CUESHEET' in tag:
+                return cls.parse(tag['CUESHEET'])
+            elif 'Cuesheet' in tag:
+                return cls.parse(tag['Cuesheet'])
+            else:
+                return None
+        else:
+            raise ValueError("Unrecognized mutagen input")
 
     @classmethod
     def from_file(cls, path: Union[str, Path], encoding=None) -> "Cuesheet":
