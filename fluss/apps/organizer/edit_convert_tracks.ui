@@ -48,6 +48,20 @@
       </widget>
      </item>
      <item>
+      <widget class="QLabel" name="label_2">
+       <property name="text">
+        <string>P/N</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="txt_partnumber">
+       <property name="toolTip">
+        <string>Part number of the disk</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QToolButton" name="tbtn_parse_tag">
        <property name="toolTip">
         <string>Extract tags from file names</string>
@@ -84,9 +98,6 @@
    </item>
    <item>
     <widget class="QTableView" name="table_tracks">
-     <property name="acceptDrops">
-      <bool>true</bool>
-     </property>
      <property name="dragDropOverwriteMode">
       <bool>false</bool>
      </property>

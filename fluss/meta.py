@@ -92,6 +92,7 @@ class DiscMeta:
     date: str
     tracks: List[TrackMeta]
     cover: bytes
+    partnumber: str
 
     _cuesheet: Cuesheet
 
@@ -104,6 +105,7 @@ class DiscMeta:
         self.date = None
         self.tracks = list()
         self.cover = None
+        self.partnumber = None
 
     def __str__(self) -> str:
         str_tracks = [f"\n\t{i:02} " + str(t).replace("\n", "\n\t") for i, t in enumerate(self.tracks)] # indent

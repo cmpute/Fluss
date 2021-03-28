@@ -1,16 +1,16 @@
 
+from parse import parse
 import re
 import typing
 from pathlib import Path
-from typing import List
-from warnings import warn
+from typing import List, Union
 
 from fluss.codecs import codec_from_filename, codec_from_name
 from fluss.config import global_config
 from fluss.meta import Cuesheet, DiscMeta, TrackMeta
 from networkx import DiGraph
 from PySide6.QtCore import (QAbstractListModel, QAbstractTableModel, QMimeData,
-                            QModelIndex, Qt)
+                            QModelIndex, Qt, QItemSelection, QItemSelectionModel)
 from PySide6.QtGui import QBrush, QColor, QDropEvent, QResizeEvent
 from PySide6.QtWidgets import (QApplication, QDialog, QFrame, QHeaderView,
                                QLabel, QLineEdit, QListView, QListWidget,
@@ -166,7 +166,7 @@ class TargetListModel(QAbstractListModel):
                 self._network.add_edge(value, target)
                 return True
             else:
-                warn("Should not drop on item!") # TODO: display warning on GUI
+                print("WARNING: Should not drop target on list item!") # TODO: display warning on GUI
                 return False
         else:
             return False
@@ -244,20 +244,25 @@ class TrackTableModel(QAbstractTableModel):
     DURATION = 'D'
     PREGAP = 'P'
 
-    def __init__(self, meta: DiscMeta, split_input: bool, track_length: list = None, track_source: list = None):
+    def __init__(self, parent: QTableView, meta: DiscMeta, track_source: List[Union[str, OrganizeTarget]], track_length: List[float] = None):
         '''
         split_track: Split audio files or single audio file with cuesheet
         '''
-        super().__init__()
+        super().__init__(parent)
+        self._view = parent
         self._meta = meta
-        self._split_input = split_input
-        if self._split_input:
-            self._columns = [self.SOURCE, self.TITLE, self.ARTISTS, self.DURATION]
-            self._columns_editable = {self.TITLE, self.ARTISTS}
-        else:
-            self._columns = [self.TITLE, self.ARTISTS, self.DURATION, self.PREGAP]
-            self._columns_editable = {self.TITLE, self.ARTISTS, self.DURATION, self.PREGAP}
+        self._split_input = not (meta.cuesheet and len(track_source) == 1)
+        self._columns = [self.TITLE, self.ARTISTS, self.DURATION]
+        self._columns_editable = {self.TITLE, self.ARTISTS}
+        if len(track_source) > 1:
+            self._columns = [self.SOURCE] + self._columns
+        if meta.cuesheet:
+            self._columns.append([self.PREGAP])
+            self._columns_editable.add(self.DURATION)
+            self._columns_editable.add(self.PREGAP)
 
+        # logging order change
+        self._track_order = list(range(len(track_length) if track_length else len(self._meta.tracks)))
         self._track_length = track_length
         self._track_source = track_source
 
@@ -270,11 +275,27 @@ class TrackTableModel(QAbstractTableModel):
                 else:
                     return ""
             else:
-                track = self._meta.tracks[index.row()-1]
+                i = index.row()-1
                 if self._columns[index.column()] == self.TITLE:
-                    return track.title
+                    return self._meta.tracks[i].title
                 elif self._columns[index.column()] == self.ARTISTS:
-                    return track.full_artist
+                    return self._meta.tracks[i].full_artist
+                elif self._columns[index.column()] == self.SOURCE:
+                    actual_idx = self._track_order[i]
+                    if isinstance(self._track_source[actual_idx], str):
+                        return self._track_source[actual_idx]
+                    else:
+                        return self._track_source[actual_idx].output_name
+                elif self._columns[index.column()] == self.DURATION:
+                    actual_idx = self._track_order[i]
+                    if self._meta.cuesheet:
+                        # TODO: implement, need to align cuesheet file name with input name
+                        return "N/A"
+                    else:
+                        l = self._track_length[actual_idx]
+                    s, ss = int(l), l-int(l)
+                    fss = ("%.3f" % ss)[1:]
+                    return f"{s//60}:{s%60:02}{fss} ({round(ss*75):02})"
                 else:
                     return "N/A"
 
@@ -289,7 +310,7 @@ class TrackTableModel(QAbstractTableModel):
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         flag = super().flags(index)
-        flag_drop = Qt.ItemIsDropEnabled if self._split_input else 0
+        flag_drop = Qt.ItemIsDropEnabled if not self._meta.cuesheet else 0
         if index.isValid():
             if self._columns[index.column()] in self._columns_editable:
                 flag = flag | Qt.ItemIsEditable
@@ -335,23 +356,47 @@ class TrackTableModel(QAbstractTableModel):
         return False
 
     def relocateRows(self, srcRows: List[int], targetRow: int):
-        # TODO: reorder tracks
-        pass
+        print(srcRows, targetRow)
+        srcRows = [i-1 for i in srcRows]
 
-    def patch(self, tableview: QTableView):
-        def patchedDropEvent(event: QDropEvent):
-            if event.source() is not tableview or event.dropAction() != Qt.MoveAction:
-                return QTableView.dropEvent(tableview, event)
+        src_indices = []
+        src_tracks = []
+        for i in srcRows:
+            src_indices.append(self._track_order[i])
+            src_tracks.append(self._meta.tracks[i])
+            self._track_order[i] = None
+            self._meta.tracks[i] = None
+        if targetRow == -2:
+            new_indices = self._track_order + src_indices
+            new_tracks  = self._meta.tracks + src_tracks
+        elif targetRow < 1:
+            new_indices = src_indices + self._track_order
+            new_tracks  = src_tracks + self._meta.tracks
+        else:
+            new_indices = self._track_order[:targetRow] + src_indices + self._track_order[targetRow:]
+            new_tracks  = self._meta.tracks[:targetRow] + src_tracks  + self._meta.tracks[targetRow:]
+        self._track_order = [v for v in new_indices if v is not None]
+        self._meta.tracks = [v for v in new_tracks if v is not None]
 
-            selection = tableview.selectedIndexes()
+        # self._view.setCurrentIndex()
+        topleft = self.index(self._track_order.index(src_indices[0])+1, 0)
+        bottomright = self.index(self._track_order.index(src_indices[-1])+1, len(self._columns)-1)
+        selection = QItemSelection(topleft, bottomright)
+        self._view.selectionModel().select(selection, QItemSelectionModel.ClearAndSelect)
+
+    def dropMimeData(self, data: QMimeData, action: Qt.DropAction, row: int, column: int, parent: QModelIndex) -> bool:
+        if data.hasFormat(self.mimeTypes()[0]): # qlist item mime
+            selection = self._view.selectedIndexes()
             from_index = list({i.row() for i in selection})
-            to_index = tableview.indexAt(event.pos()).row()
-            tableview.model().relocateRows(from_index, to_index)
-            event.accept()
-            return QTableView.dropEvent(tableview, event)
-
-        tableview.dropEvent = patchedDropEvent
-        tableview.setStyle(TableRowMarkerStyle())
+            if parent.isValid():
+                to_index = parent.row()
+            else:
+                to_index = row - 1
+            self.relocateRows(from_index, to_index)
+            return True
+        else:
+            return False
+        return super().dropMimeData(data, action, row, column, parent)
 
 def editCopyTarget(self: CopyTarget, input_root: Path = None, output_root: Path = None):
     dialog = QDialog()
@@ -370,18 +415,28 @@ def editConvertTracksTarget(self: ConvertTracksTarget, input_root: Path = None, 
     layout.setupUi(dialog)
     layout.retranslateUi(dialog)
 
-    # set UI structure
-    layout.tbtn_parse_tag.setVisible(len(self._tracks) > 1)
+    # set UI structure, TODO: implement extracting tag from file name
     layout.panel_parsing.setVisible(False)
     layout.tbtn_parse_tag.clicked.connect(lambda: layout.panel_parsing.setVisible(not layout.panel_parsing.isVisible()))
     layout.check_split_tracks.setChecked(self._split_tracks)
 
     # fill available codecs
     layout.txt_outname.setPlaceholderText(self._default_output_name())
+    layout.txt_outname.setText(self._outstem)
     codecs_names = [f".{codec_from_name[v.type].suffix} ({c})" for c, v in global_config.audio_codecs.items()]
     layout.cbox_suffix.addItems(codecs_names)
     current_codec_type = global_config.audio_codecs[self._codec].type
     layout.cbox_suffix.setCurrentText(f".{codec_from_name[current_codec_type].suffix} ({self._codec})")
+
+    # util for extract tag
+    def tag_from_source(source):
+        if isinstance(source, str):
+            cls_codec = codec_from_filename(input_root / source)
+            return cls_codec.mutagen(input_root / source)
+        else: # isinstance(self._cue, (CopyTarget, TranscodeTrackTarget)):
+            assert isinstance(source._input, str), "Cannot parse tags from complex target"
+            cls_codec = codec_from_filename(input_root / source._input)
+            return cls_codec.mutagen(input_root / source)
 
     # extract disc meta if first time
     if self._meta is None:
@@ -397,15 +452,7 @@ def editConvertTracksTarget(self: ConvertTracksTarget, input_root: Path = None, 
         cue_from_file = False
         for i, track in enumerate(self._tracks):
             # Extract cuesheet
-            if isinstance(track, str):
-                cls_codec = codec_from_filename(input_root / track)
-                file_tags = cls_codec.mutagen(input_root / track)
-            else: # isinstance(self._cue, (CopyTarget, TranscodeTrackTarget)):
-                assert isinstance(track._input, str), "Cannot parse cuesheet from complex target"
-                cls_codec = codec_from_filename(input_root / track._input)
-                file_tags = cls_codec.mutagen(input_root / track)
-
-            # Extract cuesheet
+            file_tags = tag_from_source(track)
             cs = Cuesheet.from_mutagen(file_tags)
             if cs:
                 if cue_from_file:
@@ -424,16 +471,36 @@ def editConvertTracksTarget(self: ConvertTracksTarget, input_root: Path = None, 
     # fill table content
     layout.txt_album_artists.setText("; ".join(self._meta.artists))
     layout.txt_album_title.setText(self._meta.title)
+    layout.txt_partnumber.setText(self._meta.partnumber)
+    layout.tbtn_parse_tag.setVisible(self._meta.cuesheet is None)
 
-    split_input = not (self._meta.cuesheet and len(self._tracks) == 1)
+    # set up model
     meta_copy = DiscMeta()
     meta_copy.update(self._meta)
-    table_model = TrackTableModel(meta_copy, split_input)
-    table_model.patch(layout.table_tracks)
+    track_lengths = [tag_from_source(track).info.length for track in self._tracks]
+    table_model = TrackTableModel(layout.table_tracks, meta_copy, self._tracks, track_lengths)
     layout.table_tracks.setModel(table_model)
+    layout.table_tracks.setStyle(TableRowMarkerStyle())
+    layout.table_tracks.resizeColumnsToContents()
 
     if dialog.exec_():
         self._meta = meta_copy
+        self._meta.title = layout.txt_album_title.text()
+        self._meta.artists = re.split(r",\s|;\s", layout.txt_album_artists.text())
+        self._meta.partnumber = layout.txt_partnumber.text()
+        self._outstem = layout.txt_outname.text()
+        self._split_tracks = layout.check_split_tracks.isChecked()
+
+        # update codec selection
+        suffix, codec = parse(".{} ({})", layout.cbox_suffix.currentText())
+        self._outstem = layout.txt_outname.text()
+        if self._outstem.endswith(suffix):
+            self._outstem = self._outstem[:-len(suffix)-1]
+        self._codec = codec
+
+        # update track order
+        tracks_new = [self._tracks[i] for i in table_model._track_order]
+        self._tracks = tracks_new
 
 def editTranscodeTextTarget(self: TranscodeTextTarget, input_root: Path = None, output_root=None):
     assert isinstance(self._input[0], str), "Only support reading from file by now!"

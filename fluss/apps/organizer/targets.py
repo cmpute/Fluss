@@ -1,10 +1,10 @@
 from pathlib import Path, PurePath
 from typing import List, Union
 from io import BytesIO
-from parse import parse
 
 from fluss.config import global_config
 from fluss.codecs import codec_from_name, codec_from_filename
+from fluss.meta import DiscMeta
 
 # readable suffixes supported by pillow
 PILLOW_SUFFIXES = ['png', 'jpg', 'bmp', 'tiff']
@@ -89,6 +89,7 @@ class ConvertTracksTarget(OrganizeTarget):
     only allow 1 cover, 1 cue, n audio files
     '''
     description = "Convert Tracks"
+    _meta: DiscMeta
 
     def __init__(self, input_files, codec=global_config.organizer.output_codec.audio, split_tracks=False):
         super().__init__(input_files)
@@ -100,9 +101,23 @@ class ConvertTracksTarget(OrganizeTarget):
             self._codec = global_config.organizer.output_codec.audio
 
         self._tracks, self._cue, self._cover, unknown_files = ConvertTracksTarget._sort_files(input_files)
-        self._tracks.sort()
         if len(unknown_files) > 0:
             raise ValueError("Not all input files are accepted.")
+
+        # sort tracks lexically
+        def track_key(track):
+            name = track if isinstance(track, str) else track.output_name
+            nums = []
+            for i, c in enumerate(name):
+                if c.isspace():
+                    continue
+                if c.isdigit():
+                    nums.append(c)
+                else:
+                    break
+            lexical_name = chr(int(''.join(nums))) + name[i:] if nums else name
+            return lexical_name
+        self._tracks.sort(key=track_key)
 
         self._meta = None
         self._split_tracks = split_tracks

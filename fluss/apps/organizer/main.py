@@ -1,4 +1,5 @@
 import re
+from os.path import commonprefix
 from itertools import islice
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog,
 
 from . import main_rc
 from .main_ui import Ui_MainWindow
-from .targets import target_types
+from .targets import target_types, ConvertTracksTarget
 from .widgets import _get_icon, TargetListModel, PRED_COLOR, USED_COLOR, editTarget
 
 # TODO: add help (as below)
@@ -36,7 +37,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.retranslateUi(self)
         self.setupSignals()
-        # self.addOutputFolder("CD")
 
         # load resources
         self.setWindowIcon(_get_icon())
@@ -52,7 +52,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_close.clicked.connect(self.safeClose)
         self.btn_add_folder.clicked.connect(lambda: self.addOutputFolder(self.txt_folder_name.currentText()))
         self.btn_del_folder.clicked.connect(self.removeOutputFolder)
-        self.btn_reset.clicked.connect(self.reset)
+        self.btn_reset.clicked.connect(lambda: self.txt_input_path.clear() or self.reset())
         self.txt_input_path.textChanged.connect(self.inputChanged)
         self.list_input_files.itemDoubleClicked.connect(self.previewInput)
         self.list_input_files.itemPressed.connect(self.updateSelectedInput)
@@ -96,6 +96,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if self._last_tab_index is not None:
             self.flushFolderMeta(self._last_tab_index)
+            # TODO: save and load placeholder text for partnumber
         self._last_tab_index = index
 
         current_meta = self._meta.folders[self.tab_folders.tabText(index)]
@@ -248,6 +249,38 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.addTargetActions(menu)
         action = menu.exec_(self.list_input_files.mapToGlobal(pos))
 
+    def fillMetaFromFolder(self):
+        partnumbers = []
+        for target in self.currentOutputList._targets:
+            if isinstance(target, ConvertTracksTarget):
+                if target._meta.title:
+                    self.txt_title.setPlaceholderText(target._meta.title)
+                if target._meta.full_artist:
+                    self.txt_artists.setPlaceholderText(target._meta.full_artist)
+                if target._meta.cuesheet:
+                    if target._meta.cuesheet.rems.get('COMMENT', ''):
+                        comment = target._meta.cuesheet.rems['COMMENT']
+                        if 'Exact Audio Copy' in comment:
+                            self.txt_tool.setPlaceholderText(comment)
+                        else:
+                            self.txt_comment.setPlaceholderText(comment)
+                    if target._meta.cuesheet.rems.get('DATE', ''):
+                        self.txt_date.setText(target._meta.cuesheet.rems['DATE'])
+                if target._meta.partnumber:
+                    partnumbers.append(target._meta.partnumber)
+
+        # combine partnumbers
+        if len(partnumbers) > 1:
+            prefix = commonprefix(partnumbers)
+            remain = [pn[len(prefix):] for pn in partnumbers]
+            remain_num = [int(i) for i in remain]
+            rmin, rmax = min(remain_num), max(remain_num)
+            if rmax - rmin + 1 == len(remain):
+                rlen = len(remain[0])
+                self.txt_partnumber.setPlaceholderText(prefix + str(rmin).zfill(rlen) + '~' + str(rmax).zfill(rlen))
+        elif len(partnumbers) == 1:
+            self.txt_partnumber.setPlaceholderText(partnumbers[0])
+
     def outputContextMenu(self, listview: QListView, pos: QPoint):
         current_model = listview.model()
         menu = QMenu()
@@ -256,8 +289,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             current_model[listview.currentIndex().row()],
             input_root=Path(self.txt_input_path.text()),
             output_root=Path(self.txt_output_path.text(), self.tab_folders.tabText(self.tab_folders.currentIndex()))
-        ))
-        # TODO: trigger update of the overall metadata if not filled
+        ) or self.fillMetaFromFolder())
         menu.addAction(edit_action)
         delete_action = QAction("Remove", menu)
         delete_action.triggered.connect(lambda: current_model.__delitem__(
@@ -330,9 +362,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.widget_keywords.extendKeywords(keywords)
 
     def reset(self):
+        # clear text
         self.list_input_files.clear()
         self.widget_keywords.clear()
         self.tab_folders.clear()
+
+        # clear placeholder text
+        self.txt_title.setPlaceholderText(None)
+        self.txt_artists.setPlaceholderText(None)
+        self.txt_partnumber.setPlaceholderText(None)
+        self.txt_date.setPlaceholderText(None)
+        self.txt_comment.setPlaceholderText(None)
 
         self._input_folder = None
         self._shared_states.hovered = None

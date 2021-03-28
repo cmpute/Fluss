@@ -1,4 +1,4 @@
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, OrderedDict
 from pathlib import Path
 from typing import Dict, Union
 from os import linesep
@@ -74,13 +74,13 @@ class Cuesheet:
         self.title = None
         self.performer = None
         self.catalog = None
-        self.files = defaultdict(dict)
+        self.files = OrderedDict()
 
     def update(self, cuesheet: "Cuesheet", overwrite: bool = True, merge_file: bool = None):
         '''
         :param merge_file: Whether merge track list to be under the same file.
             Only take place when both cuesheet has only one file.
-            If None, then only file named as CDImage.wav will be merged.
+            If None, then only file named as default name (CDImage.wav) will be merged.
         '''
         # merge simple fields
         for key in ['title', 'performer', 'catalog']:
@@ -96,6 +96,8 @@ class Cuesheet:
         # merge tracks
         def merge_tracks(file_cur, file_merge):
             for track_idx, track in cuesheet.files[file_merge].items():
+                if file_cur not in self.files:
+                    self.files[file_cur] = dict()
                 if track_idx not in self.files[file_cur]:
                     self.files[file_cur][track_idx] = track
                 else:
@@ -110,8 +112,7 @@ class Cuesheet:
                 merge_tracks(file_cur, file_merge)
             elif merge_file is None and file_cur == _default_cuesheet_file:
                 if file_cur != file_merge: # change file name
-                    self.files[file_merge] = self.files[file_cur]
-                    del self.files[file_cur]
+                    self.files = OrderedDict([(file_merge, v) if k == file_cur else (k, v) for k, v in self.files.items()])
                 merge_tracks(file_merge, file_merge)
             else:
                 merge_tracks(file_merge, file_merge)
