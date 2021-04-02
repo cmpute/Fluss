@@ -2,11 +2,12 @@ import re
 from os.path import commonprefix
 from itertools import islice
 from pathlib import Path
+from typing import List
 
 from addict import Dict as edict
 from fluss.config import global_config
 from fluss.meta import AlbumMeta, FolderMeta
-from networkx import DiGraph
+from networkx import DiGraph, topological_sort
 from PySide6.QtCore import QModelIndex, QPoint, QSize, Qt, QUrl, Signal
 from PySide6.QtGui import (QAction, QBrush, QColor, QContextMenuEvent,
                            QDesktopServices, QIcon, QKeyEvent)
@@ -17,7 +18,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog,
 
 from . import main_rc
 from .main_ui import Ui_MainWindow
-from .targets import target_types, ConvertTracksTarget
+from .targets import target_types, MergeTracksTarget, OrganizeTarget
 from .widgets import _get_icon, TargetListModel, PRED_COLOR, USED_COLOR, editTarget
 
 # TODO: add help (as below)
@@ -53,6 +54,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_add_folder.clicked.connect(lambda: self.addOutputFolder(self.txt_folder_name.currentText()))
         self.btn_del_folder.clicked.connect(self.removeOutputFolder)
         self.btn_reset.clicked.connect(lambda: self.txt_input_path.clear() or self.reset())
+        self.btn_apply.clicked.connect(self.executeTargets)
         self.txt_input_path.textChanged.connect(self.inputChanged)
         self.list_input_files.itemDoubleClicked.connect(self.previewInput)
         self.list_input_files.itemPressed.connect(self.updateSelectedInput)
@@ -217,7 +219,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.close()
 
     def previewInput(self, item: QListWidgetItem):
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(self.txt_input_path.text(), item.text()))))
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._input_folder / item.text())))
 
     def addTargetActions(self, menu: QMenu):
         selected_items = [i.text() for i in self.list_input_files.selectedItems()]
@@ -252,7 +254,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def fillMetaFromFolder(self):
         partnumbers = []
         for target in self.currentOutputList._targets:
-            if isinstance(target, ConvertTracksTarget):
+            if isinstance(target, MergeTracksTarget):
                 if target._meta.title:
                     self.txt_title.setPlaceholderText(target._meta.title)
                 if target._meta.full_artist:
@@ -269,15 +271,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if target._meta.partnumber:
                     partnumbers.append(target._meta.partnumber)
 
-        # combine partnumbers
+        # combine part numbers
         if len(partnumbers) > 1:
-            prefix = commonprefix(partnumbers)
-            remain = [pn[len(prefix):] for pn in partnumbers]
-            remain_num = [int(i) for i in remain]
-            rmin, rmax = min(remain_num), max(remain_num)
-            if rmax - rmin + 1 == len(remain):
-                rlen = len(remain[0])
-                self.txt_partnumber.setPlaceholderText(prefix + str(rmin).zfill(rlen) + '~' + str(rmax).zfill(rlen))
+            try:
+                prefix = commonprefix(partnumbers)
+                remain = [pn[len(prefix):] for pn in partnumbers]
+                remain_num = [int(i) for i in remain]
+                rmin, rmax = min(remain_num), max(remain_num)
+                if rmax - rmin + 1 == len(remain):
+                    rlen = len(remain[0])
+                    self.txt_partnumber.setPlaceholderText(prefix + str(rmin).zfill(rlen) + '~' + str(rmax).zfill(rlen))
+            except ValueError: # non trivial part numbers
+                pass
         elif len(partnumbers) == 1:
             self.txt_partnumber.setPlaceholderText(partnumbers[0])
 
@@ -287,7 +292,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         edit_action = QAction("Edit clicked" if len(listview.selectedIndexes()) > 1 else "Edit", menu)
         edit_action.triggered.connect(lambda: editTarget(
             current_model[listview.currentIndex().row()],
-            input_root=Path(self.txt_input_path.text()),
+            input_root=self._input_folder,
             output_root=Path(self.txt_output_path.text(), self.tab_folders.tabText(self.tab_folders.currentIndex()))
         ) or self.fillMetaFromFolder())
         menu.addAction(edit_action)
@@ -352,14 +357,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # generate keywords
         keywords = []
         delimits = r';| - |\[|\]|\(|\)'
-        folder = Path(self.txt_input_path.text()).name
+        folder = path.name
         for word in re.split(delimits, folder):
             word = word.strip()
             if word:
                 keywords.append(word)
         # TODO: iterate over input files
-
         self.widget_keywords.extendKeywords(keywords)
+
+        # default output path
+        self.txt_output_path.setText(str(path.parent / "organized" / path.name))
 
     def reset(self):
         # clear text
@@ -397,6 +404,36 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.list_input_files.setDragEnabled(False)
         elif event.key() in [Qt.Key_Shift, Qt.Key_Control]:
             self._enable_cross_selection = False
+
+    def executeTargets(self):
+        order: List[OrganizeTarget]
+        order = topological_sort(self._network)
+
+        # get output folder
+        folder_map = {}
+        for i in range(self.tab_folders.count()):
+            folder = self.tab_folders.tabText(i)
+            for target in self.tab_folders.widget(i).model():
+                folder_map[target] = folder
+
+        output_root=Path(self.txt_output_path.text())
+        output_root.mkdir(exist_ok=True, parents=True)
+        files_to_remove = []
+        for target in order:
+            if isinstance(target, str):
+                continue
+
+            output_folder_root = output_root / folder_map[target]
+            output_folder_root.mkdir(exist_ok=True)
+            self.statusbar.showMessage("Executing " + str(target))
+            target.apply(self._input_folder, output_folder_root)
+
+            if target.temporary:
+                files_to_remove.append(output_folder_root / target.output_name)
+
+        for f in files_to_remove:
+            f.unlink()
+        self.statusbar.showMessage("Organizing done successfully!")
 
 def entry():
     import sys

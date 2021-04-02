@@ -1,6 +1,7 @@
 from pathlib import Path, PurePath
 from typing import List, Union
 from io import BytesIO
+from shutil import copy2 as copy
 
 from fluss.config import global_config
 from fluss.codecs import codec_from_name, codec_from_filename
@@ -12,31 +13,23 @@ PILLOW_SUFFIXES = ['png', 'jpg', 'bmp', 'tiff']
 class OrganizeTarget:
     description = "Target"
 
-    def __init__(self, input_files: List[Union[str, "OrganizeTarget"]]):
+    def __init__(self, input_files: List[Union[str, "OrganizeTarget"]]) -> None:
         if not isinstance(input_files, list):
             self._input = [input_files]
         else:
             self._input = input_files
         self.temporary = False
 
-    def switch_temporary(self):
+    def switch_temporary(self) -> None:
         self.temporary = not self.temporary
 
     @classmethod
-    def validate(self, input_files: List[Union[str, "OrganizeTarget"]]):
+    def validate(self, input_files: List[Union[str, "OrganizeTarget"]]) -> bool:
         return False
 
     @property
-    def output_name(self):
+    def output_name(self) -> str:
         ''' output file name'''
-        raise NotImplementedError("Abstract property!")
-
-    def apply(self, input_root: Path = None, output_root: Path = None):
-        ''' execute target
-        input_root is used when input is str
-        output_root is used when this target is not marked as temporary
-        Should return the path to result file
-        '''
         raise NotImplementedError("Abstract property!")
 
     def apply_stream(self, input_root: Path = None) -> BytesIO:
@@ -44,6 +37,15 @@ class OrganizeTarget:
         Should return the generated binary data
         '''
         raise NotImplementedError("Abstract property!")
+
+    def apply(self, input_root: Path, output_root: Path) -> None:
+        ''' execute target
+        input_root is used when input is str
+        output_root is used when this target is not marked as temporary
+        Should return the path to result file
+        '''
+        data = self.apply_stream(input_root)
+        Path(output_root, self.output_name).write_bytes(data.getvalue())
 
 
 def _split_name(target: Union[str, OrganizeTarget]):
@@ -79,19 +81,31 @@ class CopyTarget(OrganizeTarget):
     def output_name(self):
         return self._outname
 
+    def __str__(self):
+        return "Copying %s" % self.output_name
+
+    def __repr__(self):
+        return "<CopyTarget output=%s>" % self.output_name
+
+    def apply(self, input_root, output_root):
+        copy(Path(input_root, self._input[0]), Path(output_root, self._outname))
+
+    def apply_stream(self, input_root):
+        return BytesIO(Path(input_root, self._input[0]).read_bytes())
+
 class TranscodeTrackTarget(OrganizeTarget):
     ''' Support recoding single audio files '''
     description = "Transcode Tracks"
     # TODO: implement track conversion (This is useful for DSD)
 
-class ConvertTracksTarget(OrganizeTarget):
+class MergeTracksTarget(OrganizeTarget):
     ''' Support recoding, merging, embedding cue and embedding cover
     only allow 1 cover, 1 cue, n audio files
     '''
-    description = "Convert Tracks"
+    description = "Merge Tracks"
     _meta: DiscMeta
 
-    def __init__(self, input_files, codec=global_config.organizer.output_codec.audio, split_tracks=False):
+    def __init__(self, input_files, codec=global_config.organizer.output_codec.audio):
         super().__init__(input_files)
 
         self._outstem = "" # empty means using default name
@@ -100,7 +114,7 @@ class ConvertTracksTarget(OrganizeTarget):
         else:
             self._codec = global_config.organizer.output_codec.audio
 
-        self._tracks, self._cue, self._cover, unknown_files = ConvertTracksTarget._sort_files(input_files)
+        self._tracks, self._cue, self._cover, unknown_files = MergeTracksTarget._sort_files(input_files)
         if len(unknown_files) > 0:
             raise ValueError("Not all input files are accepted.")
 
@@ -120,7 +134,6 @@ class ConvertTracksTarget(OrganizeTarget):
         self._tracks.sort(key=track_key)
 
         self._meta = None
-        self._split_tracks = split_tracks
 
     @staticmethod
     def _sort_files(input_files):
@@ -152,11 +165,12 @@ class ConvertTracksTarget(OrganizeTarget):
 
     @classmethod
     def validate(cls, input_files):
-        _, _, _, unknown_files = ConvertTracksTarget._sort_files(input_files)
+        _, _, _, unknown_files = MergeTracksTarget._sort_files(input_files)
         return len(unknown_files) == 0
 
     def _default_output_name(self):
-        # TODO: use catalog if available
+        if self._meta and self._meta.partnumber:
+            return self._meta.partnumber
         if len(self._tracks) == 1:
             return "CDImage"
         else:
@@ -167,6 +181,15 @@ class ConvertTracksTarget(OrganizeTarget):
         fname = self._outstem or self._default_output_name()
         codec_cls = codec_from_name[global_config.audio_codecs[self._codec].type]
         return fname + "." + codec_cls.suffix
+
+    def __str__(self):
+        if len(self._tracks) == 1:
+            return "Converting CD image into %s" % self.output_name
+        else:
+            return "Merging tracks into %s" % self.output_name
+
+    def __repr__(self):
+        return "<MergeTracksTarget output=%s>" % self.output_name
 
 class TranscodeTextTarget(OrganizeTarget):
     ''' Support text encoding fixing '''
@@ -202,9 +225,15 @@ class TranscodeTextTarget(OrganizeTarget):
     def output_name(self):
         return self._outname
 
-    def apply_stream(self, input_root: Path):
-        content = Path(input_root, self._input[0]).read_bytes()
-        return BytesIO(content.decode(encoding=self._encoding, errors="replace").encode('utf-8-sig'))
+    def apply_stream(self, input_root):
+        content = Path(input_root, self._input[0]).read_bytes(encoding=self._encoding, errors="replace")
+        return BytesIO(content.encode('utf-8-sig'))
+
+    def __str__(self):
+        return "Transcoding text to %s" % self.output_name
+
+    def __repr__(self):
+        return "<TranscodeTextTarget output=%s>" % self.output_name
 
 class TranscodePictureTarget(OrganizeTarget):
     ''' Support transcoding '''
@@ -238,6 +267,12 @@ class TranscodePictureTarget(OrganizeTarget):
             return False
         return True
 
+    def __str__(self):
+        return "Transcoding picture to %s" % self.output_name
+
+    def __repr__(self):
+        return "<TranscodePictureTarget output=%s>" % self.output_name
+
 class CropPictureTarget(OrganizeTarget):
     ''' Support cover cropping '''
     description = "Crop Image"
@@ -247,7 +282,7 @@ class CropPictureTarget(OrganizeTarget):
 target_types = [
     CopyTarget,
     CropPictureTarget,
-    ConvertTracksTarget,
+    MergeTracksTarget,
     TranscodeTrackTarget,
     TranscodeTextTarget,
     TranscodePictureTarget,

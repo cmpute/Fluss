@@ -16,11 +16,11 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFrame, QHeaderView,
                                QLabel, QLineEdit, QListView, QListWidget,
                                QWidget, QTableView, QProxyStyle, QStyleOption)
 
-from .edit_convert_tracks_ui import Ui_ConvertTracksTargetDialog
+from .edit_merge_tracks_ui import Ui_MergeTracksTargetDialog
 from .edit_copy_target_ui import Ui_CopyTargetDialog
 from .edit_transcode_target_ui import Ui_TranscodeTargetDialog
 from .edit_transcode_text_target_ui import Ui_TranscodeTextTargetDialog
-from .targets import (ConvertTracksTarget, CopyTarget, OrganizeTarget,
+from .targets import (MergeTracksTarget, CopyTarget, OrganizeTarget,
                       TranscodePictureTarget, TranscodeTextTarget,
                       TranscodeTrackTarget)
 
@@ -93,7 +93,7 @@ class TargetListModel(QAbstractListModel):
                 return prefix + target.output_name + " (copy)"
             elif isinstance(target, (TranscodeTextTarget, TranscodePictureTarget)):
                 return prefix + target.output_name + " (recode)"
-            elif isinstance(target, ConvertTracksTarget):
+            elif isinstance(target, MergeTracksTarget):
                 return prefix + target.output_name + " (convert)"
             elif isinstance(target, OrganizeTarget):
                 return "(dummy)"
@@ -246,12 +246,10 @@ class TrackTableModel(QAbstractTableModel):
 
     def __init__(self, parent: QTableView, meta: DiscMeta, track_source: List[Union[str, OrganizeTarget]], track_length: List[float] = None):
         '''
-        split_track: Split audio files or single audio file with cuesheet
         '''
         super().__init__(parent)
         self._view = parent
         self._meta = meta
-        self._split_input = not (meta.cuesheet and len(track_source) == 1)
         self._columns = [self.TITLE, self.ARTISTS, self.DURATION]
         self._columns_editable = {self.TITLE, self.ARTISTS}
         if len(track_source) > 1:
@@ -408,17 +406,16 @@ def editCopyTarget(self: CopyTarget, input_root: Path = None, output_root: Path 
     if dialog.exec_():
         self._outname = layout.txt_outname.text()
 
-def editConvertTracksTarget(self: ConvertTracksTarget, input_root: Path = None, output_root: Path = None):
+def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None, output_root: Path = None):
     dialog = QDialog()
     dialog.setWindowIcon(_get_icon())
-    layout = Ui_ConvertTracksTargetDialog()
+    layout = Ui_MergeTracksTargetDialog()
     layout.setupUi(dialog)
     layout.retranslateUi(dialog)
 
     # set UI structure, TODO: implement extracting tag from file name
     layout.panel_parsing.setVisible(False)
     layout.tbtn_parse_tag.clicked.connect(lambda: layout.panel_parsing.setVisible(not layout.panel_parsing.isVisible()))
-    layout.check_split_tracks.setChecked(self._split_tracks)
 
     # fill available codecs
     layout.txt_outname.setPlaceholderText(self._default_output_name())
@@ -489,7 +486,6 @@ def editConvertTracksTarget(self: ConvertTracksTarget, input_root: Path = None, 
         self._meta.artists = re.split(r",\s|;\s", layout.txt_album_artists.text())
         self._meta.partnumber = layout.txt_partnumber.text()
         self._outstem = layout.txt_outname.text()
-        self._split_tracks = layout.check_split_tracks.isChecked()
 
         # update codec selection
         suffix, codec = parse(".{} ({})", layout.cbox_suffix.currentText())
@@ -540,8 +536,8 @@ def editTranscodePictureTarget(self: TranscodePictureTarget, input_root: Path = 
         self._codec = codec
 
 def editTarget(target: OrganizeTarget, input_root: Path = None, output_root: Path = None):
-    if isinstance(target, ConvertTracksTarget):
-        editConvertTracksTarget(target, input_root, output_root)
+    if isinstance(target, MergeTracksTarget):
+        editMergeTracksTarget(target, input_root, output_root)
     elif isinstance(target, CopyTarget):
         editCopyTarget(target, input_root, output_root)
     elif isinstance(target, TranscodePictureTarget):
