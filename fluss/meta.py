@@ -236,9 +236,18 @@ class DiscMeta:
         for file_tracks in cuesheet.files.values():
             for track_idx, track in file_tracks.items():
                 meta._reserve_tracks(track_idx)
-                meta.tracks[track_idx-1].title = track.title
+
+                track_meta = TrackMeta()
+                track_updated = False
+                if track.title:
+                    track_meta.title = track.title
+                    track_updated = True
                 if track.performer:
-                    meta.tracks[track_idx-1].artists.add(track.performer)
+                    track_meta.artists.add(track.performer)
+                    track_updated = True
+
+                if track_updated:
+                    meta.tracks[track_idx-1] = track_meta
         return meta
 
     @property

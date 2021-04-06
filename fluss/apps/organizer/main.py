@@ -2,13 +2,13 @@ import re, os
 from os.path import commonprefix
 from itertools import islice
 from pathlib import Path
-from typing import List
+from typing import List, Dict, Union
 
 from addict import Dict as edict
 from fluss.config import global_config
 from fluss.meta import AlbumMeta, FolderMeta
 from networkx import DiGraph, topological_sort
-from PySide6.QtCore import QModelIndex, QPoint, QSize, Qt, QUrl, Signal
+from PySide6.QtCore import QModelIndex, QObject, QPoint, QSize, Qt, QUrl, Signal, QThread
 from PySide6.QtGui import (QAction, QBrush, QColor, QContextMenuEvent,
                            QDesktopServices, QIcon, QKeyEvent)
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog,
@@ -23,6 +23,45 @@ from .widgets import _get_icon, TargetListModel, PRED_COLOR, USED_COLOR, editTar
 
 # TODO: add help (as below)
 # - you can drag file from input to output by pressing alt
+
+class OrganizeWorker(QObject):
+    progress = Signal(int)
+    finished = Signal()
+
+    def __init__(self,
+                 input_root: Union[Path, str],
+                 output_root: Union[Path, str],
+                 target_ordered: List[OrganizeTarget],
+                 target_folder: Dict[OrganizeTarget, str]) -> None:
+        super().__init__()
+
+        self._input = Path(input_root)
+        self._output = Path(output_root)
+        self._target_ordered = target_ordered
+        self._target_folder = target_folder
+
+        # threading for executing
+        self._thread = None
+        self._worker = None
+
+    def run(self):
+        self._output.mkdir(exist_ok=True, parents=True)
+        files_to_remove = []
+        for i, target in enumerate(self._target_ordered):
+            self.progress.emit(i)
+            if isinstance(target, str):
+                continue
+
+            output_folder_root = self._output / self._target_folder[target]
+            output_folder_root.mkdir(exist_ok=True)
+            target.apply(self._input, output_folder_root)
+
+            if target.temporary:
+                files_to_remove.append(output_folder_root / target.output_name)
+
+        for f in files_to_remove:
+            f.unlink()
+        self.finished.emit()
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -198,24 +237,33 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.txt_output_path.setText(dlg.selectedFiles()[0])
 
     def safeClose(self):
-        check = False
+        check_worker = False
+        if self._thread is not None and not self._thread.isFinished():
+            check_worker = True
+
+        check_folder = False
         for i in range(self.tab_folders.count()):
             if len(self.tab_folders.widget(i).model()) > 0:
-                check = True
+                check_folder = True
                 break
 
-        if not check:
+        if not (check_folder or check_worker):
             self.close()
             return
 
         msgbox = QMessageBox(self)
         msgbox.setWindowTitle("Close")
         msgbox.setIcon(QMessageBox.Warning)
-        msgbox.setText("Do you really want to close?")
+        if check_worker:
+            msgbox.setText("There are pending jobs. Do you really want to close?")
+        else:
+            msgbox.setText("Do you really want to close?")
         msgbox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         msgbox.setDefaultButton(QMessageBox.No)
 
         if msgbox.exec_() == QMessageBox.Yes:
+            if check_worker and self._thread is not None:
+                self._thread.terminate()
             self.close()
 
     def previewInput(self, item: QListWidgetItem):
@@ -356,12 +404,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # generate keywords
         keywords = set()
-        keypattern = re.compile(r';| - |\[|\]|\(|\)')
-        keywords.update(keypattern.split(path.name))
+        keypattern = re.compile(r';| - |\[|\]|\(|\)') # TODO: make the splitter configurable
+        keywords.update(k.strip() for k in keypattern.split(path.name) if k.strip())
         if len(os.listdir(path)) == 0:
             subf = next(path.iterdir())
             if subf.is_dir():
-                keywords.update(keypattern.split(subf.name))
+                keywords.update(k.strip() for k in keypattern.split(subf.name) if k.strip())
         # TODO: extract metadata from input audio files
         self.widget_keywords.extendKeywords(keywords)
 
@@ -409,34 +457,30 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self._enable_cross_selection = False
 
     def executeTargets(self):
-        order: List[OrganizeTarget]
-        order = topological_sort(self._network)
-
         # get output folder
+        order = list(topological_sort(self._network))
         folder_map = {}
         for i in range(self.tab_folders.count()):
             folder = self.tab_folders.tabText(i)
             for target in self.tab_folders.widget(i).model():
                 folder_map[target] = folder
 
-        output_root=Path(self.txt_output_path.text())
-        output_root.mkdir(exist_ok=True, parents=True)
-        files_to_remove = []
-        for target in order:
-            if isinstance(target, str):
-                continue
+        self._thread = QThread()
+        self._worker = OrganizeWorker(self._input_folder, self.txt_output_path.text(), order, folder_map)
+        self._worker.moveToThread(self._thread)
+        self._thread.started.connect(self._worker.run)
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.finished.connect(self._worker.deleteLater)
+        self._thread.finished.connect(self._thread.deleteLater)
 
-            output_folder_root = output_root / folder_map[target]
-            output_folder_root.mkdir(exist_ok=True)
-            self.statusbar.showMessage("Executing " + str(target))
-            target.apply(self._input_folder, output_folder_root)
+        def finished():
+            self.statusbar.showMessage("Organizing done successfully!", 2000)
+            self._worker = None
+            self._thread = None
+        self._worker.finished.connect(finished)
+        self._worker.progress.connect(lambda i: self.statusbar.showMessage("Executing " + str(order[i])))
 
-            if target.temporary:
-                files_to_remove.append(output_folder_root / target.output_name)
-
-        for f in files_to_remove:
-            f.unlink()
-        self.statusbar.showMessage("Organizing done successfully!")
+        self._thread.start()
 
 def entry():
     import sys

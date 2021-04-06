@@ -3,7 +3,7 @@ import io
 import subprocess
 import wave
 from pathlib import Path
-from typing import List, Type, Union
+from typing import Callable, List, Type, Union
 
 from fluss.config import global_config as C
 import mutagen
@@ -35,7 +35,8 @@ class AudioCodec:
         else:
             self.encode_args = [encode_args]
 
-    def encode(self, fout: str, wavein: bytes) -> None:
+    def encode(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None]) -> None:
+        # TODO: implement progress reporting by reading stdout for encoders (without silent mode)
         raise NotImplementedError("Abstract function!")
 
     def decode(self, fin: str) -> wave.Wave_read:
@@ -64,8 +65,7 @@ class flac(AudioCodec):
 
     def decode(self, fin: str) -> wave.Wave_read:
         proc = subprocess.Popen([C.path.flac, "-sdc", _resolve_pathstr(fin)], stdout=subprocess.PIPE)
-        outs, _ = proc.communicate()
-        return wave.open(io.BytesIO(outs), "rb")
+        return wave.open(proc.stdout, "rb")
 
     @classmethod
     def mutagen(cls, fin: str) -> mutagen.flac.FLAC:
@@ -85,8 +85,7 @@ class wavpack(AudioCodec):
 
     def decode(self, fin: str):
         proc = subprocess.Popen([C.path.wvunpack, '-yq', _resolve_pathstr(fin), "-"], stdout=subprocess.PIPE)
-        outs, _ = proc.communicate()
-        return wave.open(io.BytesIO(outs), "rb")
+        return wave.open(proc.stdout, "rb")
 
     @classmethod
     def mutagen(cls, fin: str) -> mutagen.wavpack.WavPack:
@@ -118,6 +117,7 @@ def merge_streams(streams: List[Union[wave.Wave_read, float]], fout: io.RawIOBas
             wave_out.setparams(params)
         if isinstance(wave_in, wave.Wave_read):
             wave_out.writeframes(wave_in.readframes(wave_in.getnframes()))
+            wave_in.close()
         elif isinstance(wave_in, float):
             # add silence of nchannels * sampwidth * framerate * time frames
             wave_out.writeframes(b'\0' * int(params[0]*params[1]*params[2]*wave_in))

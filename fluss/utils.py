@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import Callable, List, Union
 
 import mutagen
 from fluss import codecs
@@ -132,5 +132,7 @@ def convert_track(file_in: Union[str, Path],
 
     if not dry_run:
         meta = DiscMeta.from_mutagen(codec_in.mutagen(file_in))
-        codec_out.encode(file_out, codec_in.decode(file_in))
+        wave_in = codec_in.decode(file_in)
+        codec_out.encode(file_out, wave_in)
+        wave_in.close()
         meta.to_mutagen(codec_out.mutagen(file_out))
