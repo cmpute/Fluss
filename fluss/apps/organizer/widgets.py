@@ -339,7 +339,7 @@ class TrackTableModel(QAbstractTableModel):
             if self._columns[col] == self.TITLE:
                 self._meta.tracks[i].title = value
             elif self._columns[col] == self.ARTISTS:
-                self._meta.tracks[i].artists = re.split(r',\s|;\s', value)
+                self._meta.tracks[i].artists = set(re.split(r',\s|;\s', value))
             elif self._columns[col] == self.PREGAP:
                 pass
 
@@ -483,7 +483,7 @@ def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None, outp
     if dialog.exec_():
         self._meta = meta_copy
         self._meta.title = layout.txt_album_title.text()
-        self._meta.artists = re.split(r",\s|;\s", layout.txt_album_artists.text())
+        self._meta.artists = set(re.split(r",\s+|;\s+", layout.txt_album_artists.text()))
         self._meta.partnumber = layout.txt_partnumber.text()
         self._outstem = layout.txt_outname.text()
 

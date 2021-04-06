@@ -1,4 +1,4 @@
-import re
+import re, os
 from os.path import commonprefix
 from itertools import islice
 from pathlib import Path
@@ -355,20 +355,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self._network.add_nodes_from(files)
 
         # generate keywords
-        keywords = []
-        delimits = r';| - |\[|\]|\(|\)'
-        folder = path.name
-        for word in re.split(delimits, folder):
-            word = word.strip()
-            if word:
-                keywords.append(word)
-        # TODO: iterate over input files
+        keywords = set()
+        keypattern = re.compile(r';| - |\[|\]|\(|\)')
+        keywords.update(keypattern.split(path.name))
+        if len(os.listdir(path)) == 0:
+            subf = next(path.iterdir())
+            if subf.is_dir():
+                keywords.update(keypattern.split(subf.name))
+        # TODO: extract metadata from input audio files
         self.widget_keywords.extendKeywords(keywords)
 
         # default output path
         self.txt_output_path.setText(str(path.parent / "organized" / path.name))
 
     def reset(self):
+        '''
+        Reset all information except for input/output path and folder list
+        '''
         # clear text
         self.list_input_files.clear()
         self.widget_keywords.clear()

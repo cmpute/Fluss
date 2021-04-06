@@ -6,6 +6,7 @@ from shutil import copy2 as copy
 from fluss.config import global_config
 from fluss.codecs import codec_from_name, codec_from_filename
 from fluss.meta import DiscMeta
+from fluss.utils import merge_tracks, convert_track
 
 # readable suffixes supported by pillow
 PILLOW_SUFFIXES = ['png', 'jpg', 'bmp', 'tiff']
@@ -190,6 +191,27 @@ class MergeTracksTarget(OrganizeTarget):
 
     def __repr__(self):
         return "<MergeTracksTarget output=%s>" % self.output_name
+
+    def apply(self, input_root, output_root):
+        if self._cover:
+            self._meta.cover = Path(input_root, self._cover).read_bytes()
+
+        if len(self._tracks) == 1:
+            convert_track(
+                Path(input_root, self._tracks[0]),
+                Path(output_root, self.output_name),
+                meta=self._meta
+            )
+        else:
+            merge_tracks(
+                [Path(input_root, f) for f in self._tracks],
+                Path(output_root, self.output_name),
+                meta=self._meta
+            )
+
+    def apply_stream(self, input_root):
+        # TODO: apply and then read
+        pass
 
 class TranscodeTextTarget(OrganizeTarget):
     ''' Support text encoding fixing '''

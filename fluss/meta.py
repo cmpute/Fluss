@@ -313,9 +313,14 @@ class DiscMeta:
         if self.date:
             gen.rems['DATE'] = self.date
         for track_idx, track in enumerate(self.tracks):
+            if track is None:
+                continue
+
             cuetrack = CuesheetTrack()
             cuetrack.title = track.title
             cuetrack.performer = track.full_artist
+            if _default_cuesheet_file not in gen.files:
+                gen.files[_default_cuesheet_file] = {}
             gen.files[_default_cuesheet_file][track_idx + 1] = cuetrack
 
         if self._cuesheet is not None:

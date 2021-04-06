@@ -10,13 +10,10 @@ global_config.path.flac = r"D:\Github\fluss\codecs\flac_x64.exe"
 # encoder preset configs
 global_config.audio_codecs.wavpack.type = "wavpack"
 global_config.audio_codecs.wavpack.encode = ["-m"]
-global_config.audio_codecs.wavpack.decode = [""]
 global_config.audio_codecs.wavpack_hybrid.type = "wavpack"
 global_config.audio_codecs.wavpack_hybrid.encode = ["-m", "-b192"]
-global_config.audio_codecs.wavpack_hybrid.decode = [""]
 global_config.audio_codecs.flac.type = "flac"
 global_config.audio_codecs.flac.encode = []
-global_config.audio_codecs.flac.decode = []
 global_config.image_codecs.png.type = "png"
 global_config.image_codecs.jpg.type = "jpg"
 

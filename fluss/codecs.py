@@ -11,6 +11,14 @@ import mutagen.flac
 import mutagen.wavpack
 import mutagen.apev2
 
+def _resolve_pathstr(file: Union[str, Path]):
+    if isinstance(file, str):
+        return str(Path(file).resolve())
+    elif isinstance(file, Path):
+        return str(file.resolve())
+    else:
+        raise ValueError("Incorrect path type")
+
 class AudioCodec:
     suffix: str
     ''' output suffix of files with this codec
@@ -51,11 +59,11 @@ class flac(AudioCodec):
         assert Path(C.path.flac).exists()
 
     def encode(self, fout: str, wavein: bytes) -> None:
-        proc = subprocess.Popen([C.path.flac, "-sV", "-", "-o", fout] + self.encode_args, stdin=subprocess.PIPE)
+        proc = subprocess.Popen([C.path.flac, "-sV", "-", "-o", _resolve_pathstr(fout)] + self.encode_args, stdin=subprocess.PIPE)
         proc.communicate(wavein)
 
     def decode(self, fin: str) -> wave.Wave_read:
-        proc = subprocess.Popen([C.path.flac, "-sdc", fin], stdout=subprocess.PIPE)
+        proc = subprocess.Popen([C.path.flac, "-sdc", _resolve_pathstr(fin)], stdout=subprocess.PIPE)
         outs, _ = proc.communicate()
         return wave.open(io.BytesIO(outs), "rb")
 
@@ -72,11 +80,11 @@ class wavpack(AudioCodec):
         assert Path(C.path.wvunpack).exists()
 
     def encode(self, fout: str, wavein: bytes) -> None:
-        proc = subprocess.Popen([C.path.wavpack, '-yq'] + self.encode_args + ["-", fout], stdin=subprocess.PIPE)
+        proc = subprocess.Popen([C.path.wavpack, '-yq'] + self.encode_args + ["-", _resolve_pathstr(fout)], stdin=subprocess.PIPE)
         proc.communicate(wavein)
 
     def decode(self, fin: str):
-        proc = subprocess.Popen([C.path.wvunpack, '-yq', fin, "-"], stdout=subprocess.PIPE)
+        proc = subprocess.Popen([C.path.wvunpack, '-yq', _resolve_pathstr(fin), "-"], stdout=subprocess.PIPE)
         outs, _ = proc.communicate()
         return wave.open(io.BytesIO(outs), "rb")
 
@@ -89,7 +97,7 @@ codec_from_name = {
     'flac': flac,
 }
 
-def codec_from_filename(filename: str) -> Type[AudioCodec]:
+def codec_from_filename(filename: Union[Path, str]) -> Type[AudioCodec]:
     codec_map = {('.' + c.suffix): c for c in codec_from_name.values()}
     return codec_map[Path(filename).suffix]
 
@@ -111,7 +119,7 @@ def merge_streams(streams: List[Union[wave.Wave_read, float]], fout: io.RawIOBas
         if isinstance(wave_in, wave.Wave_read):
             wave_out.writeframes(wave_in.readframes(wave_in.getnframes()))
         elif isinstance(wave_in, float):
-            # nchannels * sampwidth * framerate * time
+            # add silence of nchannels * sampwidth * framerate * time frames
             wave_out.writeframes(b'\0' * int(params[0]*params[1]*params[2]*wave_in))
         else:
             raise ValueError("Unsupported stream type!")
