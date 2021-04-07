@@ -1,20 +1,24 @@
+import asyncio
+import sys
 import re, os
+from queue import Queue
 from os.path import commonprefix
 from itertools import islice
 from pathlib import Path
 from typing import List, Dict, Union
+from qasync import QEventLoop, asyncSlot
 
 from addict import Dict as edict
 from fluss.config import global_config
 from fluss.meta import AlbumMeta, FolderMeta
 from networkx import DiGraph, topological_sort
-from PySide6.QtCore import QModelIndex, QObject, QPoint, QSize, Qt, QUrl, Signal, QThread
+from PySide6.QtCore import QModelIndex, QObject, QPoint, QSize, QTimer, Qt, QUrl, Signal, QThread
 from PySide6.QtGui import (QAction, QBrush, QColor, QContextMenuEvent,
                            QDesktopServices, QIcon, QKeyEvent)
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog,
                                QFrame, QLabel, QListView, QListWidget,
                                QListWidgetItem, QMainWindow, QMenu,
-                               QMessageBox)
+                               QMessageBox, QProgressBar)
 
 from . import main_rc
 from .main_ui import Ui_MainWindow
@@ -23,45 +27,6 @@ from .widgets import _get_icon, TargetListModel, PRED_COLOR, USED_COLOR, editTar
 
 # TODO: add help (as below)
 # - you can drag file from input to output by pressing alt
-
-class OrganizeWorker(QObject):
-    progress = Signal(int)
-    finished = Signal()
-
-    def __init__(self,
-                 input_root: Union[Path, str],
-                 output_root: Union[Path, str],
-                 target_ordered: List[OrganizeTarget],
-                 target_folder: Dict[OrganizeTarget, str]) -> None:
-        super().__init__()
-
-        self._input = Path(input_root)
-        self._output = Path(output_root)
-        self._target_ordered = target_ordered
-        self._target_folder = target_folder
-
-        # threading for executing
-        self._thread = None
-        self._worker = None
-
-    def run(self):
-        self._output.mkdir(exist_ok=True, parents=True)
-        files_to_remove = []
-        for i, target in enumerate(self._target_ordered):
-            self.progress.emit(i)
-            if isinstance(target, str):
-                continue
-
-            output_folder_root = self._output / self._target_folder[target]
-            output_folder_root.mkdir(exist_ok=True)
-            target.apply(self._input, output_folder_root)
-
-            if target.temporary:
-                files_to_remove.append(output_folder_root / target.output_name)
-
-        for f in files_to_remove:
-            f.unlink()
-        self.finished.emit()
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -73,6 +38,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._enable_cross_selection = False
         self._meta = None
         self._last_tab_index = None
+        self._executing = False
 
         self.setupUi(self)
         self.retranslateUi(self)
@@ -93,6 +59,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_add_folder.clicked.connect(lambda: self.addOutputFolder(self.txt_folder_name.currentText()))
         self.btn_del_folder.clicked.connect(self.removeOutputFolder)
         self.btn_reset.clicked.connect(lambda: self.txt_input_path.clear() or self.reset())
+        self.btn_apply.clicked.connect(lambda: self.statusbar.showMessage("Starting execution..."))
         self.btn_apply.clicked.connect(self.executeTargets)
         self.txt_input_path.textChanged.connect(self.inputChanged)
         self.list_input_files.itemDoubleClicked.connect(self.previewInput)
@@ -237,24 +204,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.txt_output_path.setText(dlg.selectedFiles()[0])
 
     def safeClose(self):
-        check_worker = False
-        if self._thread is not None and not self._thread.isFinished():
-            check_worker = True
-
         check_folder = False
         for i in range(self.tab_folders.count()):
             if len(self.tab_folders.widget(i).model()) > 0:
                 check_folder = True
                 break
 
-        if not (check_folder or check_worker):
+        if not (check_folder or self._executing):
             self.close()
             return
 
         msgbox = QMessageBox(self)
         msgbox.setWindowTitle("Close")
         msgbox.setIcon(QMessageBox.Warning)
-        if check_worker:
+        if self._executing:
             msgbox.setText("There are pending jobs. Do you really want to close?")
         else:
             msgbox.setText("Do you really want to close?")
@@ -262,7 +225,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         msgbox.setDefaultButton(QMessageBox.No)
 
         if msgbox.exec_() == QMessageBox.Yes:
-            if check_worker and self._thread is not None:
+            if self._executing and self._thread is not None:
                 self._thread.terminate()
             self.close()
 
@@ -456,38 +419,55 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         elif event.key() in [Qt.Key_Shift, Qt.Key_Control]:
             self._enable_cross_selection = False
 
-    def executeTargets(self):
+    @asyncSlot()
+    async def executeTargets(self):
+        self._executing = True
+
+        # sort targets
+        order = topological_sort(self._network)
+        order = [t for t in order if isinstance(t, OrganizeTarget)]
+
         # get output folder
-        order = list(topological_sort(self._network))
         folder_map = {}
         for i in range(self.tab_folders.count()):
             folder = self.tab_folders.tabText(i)
             for target in self.tab_folders.widget(i).model():
                 folder_map[target] = folder
 
-        self._thread = QThread()
-        self._worker = OrganizeWorker(self._input_folder, self.txt_output_path.text(), order, folder_map)
-        self._worker.moveToThread(self._thread)
-        self._thread.started.connect(self._worker.run)
-        self._worker.finished.connect(self._thread.quit)
-        self._worker.finished.connect(self._worker.deleteLater)
-        self._thread.finished.connect(self._thread.deleteLater)
+        # execute targets
+        output_path = Path(self.txt_output_path.text())
+        output_path.mkdir(exist_ok=True, parents=True)
+        files_to_remove = []
+        for i, target in enumerate(order):
+            self.statusbar.showMessage("(%d/%d) Executing: %s" % (i, len(order), str(target)))
+            if isinstance(target, str):
+                continue
 
-        def finished():
-            self.statusbar.showMessage("Organizing done successfully!", 2000)
-            self._worker = None
-            self._thread = None
-        self._worker.finished.connect(finished)
-        self._worker.progress.connect(lambda i: self.statusbar.showMessage("Executing " + str(order[i])))
+            output_folder_root = output_path / folder_map[target]
+            output_folder_root.mkdir(exist_ok=True)
+            if isinstance(target, MergeTracksTarget):
+                await target.apply(self._input_folder, output_folder_root,
+                    lambda q: self.statusbar.showMessage("(%d/%d) Executing: %s (%d%%)" % (i, len(order), str(target), int(q*100))))
+            else:
+                await target.apply(self._input_folder, output_folder_root)
 
-        self._thread.start()
+            if target.temporary:
+                files_to_remove.append(output_folder_root / target.output_name)
+
+        for f in files_to_remove:
+            f.unlink()
+        self.statusbar.showMessage("Organizing done successfully!", 2000)
+        self._executing = False
 
 def entry():
-    import sys
     app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    return app.exec_()
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
+
+    with loop:
+        window = MainWindow()
+        window.show()
+        loop.run_forever()
 
 if __name__ == "__main__":
     exit(entry())

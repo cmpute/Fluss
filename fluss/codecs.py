@@ -1,15 +1,17 @@
 import asyncio
 import io
+import re
 import subprocess
 import wave
 from pathlib import Path
-from typing import Callable, List, Type, Union
+from typing import Any, Callable, List, Type, Union
 
-from fluss.config import global_config as C
 import mutagen
+import mutagen.apev2
 import mutagen.flac
 import mutagen.wavpack
-import mutagen.apev2
+
+from fluss.config import global_config as C
 
 def _resolve_pathstr(file: Union[str, Path]):
     if isinstance(file, str):
@@ -35,9 +37,33 @@ class AudioCodec:
         else:
             self.encode_args = [encode_args]
 
-    def encode(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None]) -> None:
-        # TODO: implement progress reporting by reading stdout for encoders (without silent mode)
+    def encode(self, fout: str, wavein: bytes) -> None:
         raise NotImplementedError("Abstract function!")
+
+    async def encode_async(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None] = None) -> None:
+        raise NotImplementedError("Abstract function!")
+
+    async def _report_encode_progress(self,
+            stream: asyncio.StreamReader,
+            pattern: str,
+            convert: Callable[[str], float],
+            callback: Callable[[float], None],
+            linesep: str = b'\r\b') -> None:
+        '''
+        Utility function for codecs to match progress string from process stream
+        '''
+        pattern = re.compile(pattern)
+        finished = False
+        while not finished:
+            try:
+                line = await stream.readuntil(linesep)
+            except asyncio.exceptions.IncompleteReadError as e:
+                line = e.partial
+                finished = True
+
+            match = pattern.search(line)
+            if match:
+                callback(convert(match[0]))
 
     def decode(self, fin: str) -> wave.Wave_read:
         raise NotImplementedError("Abstract function!")
@@ -82,6 +108,31 @@ class wavpack(AudioCodec):
     def encode(self, fout: str, wavein: bytes) -> None:
         proc = subprocess.Popen([C.path.wavpack, '-yq'] + self.encode_args + ["-", _resolve_pathstr(fout)], stdin=subprocess.PIPE)
         proc.communicate(wavein)
+
+    async def encode_async(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None] = None) -> None:
+        if progress_callback is None:
+            args = [C.path.wavpack, '-yq'] + self.encode_args + ["-", _resolve_pathstr(fout)]
+            stderr = None
+        else:
+            args = [C.path.wavpack, '-y'] + self.encode_args + ["-", _resolve_pathstr(fout)]
+            stderr = subprocess.PIPE
+
+        proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.PIPE, stderr=stderr)
+
+        if progress_callback is not None:
+            ptask = self._report_encode_progress(proc.stderr,
+                                                 pattern=b'1?[0-9]{0,2}(?=% done)',
+                                                 convert=lambda s: int(s) / 100,
+                                                 callback=progress_callback,
+                                                 linesep=b'...')
+
+        proc.stdin.write(wavein)
+        proc.stdin.close()
+
+        if progress_callback is not None:
+            await asyncio.gather(ptask, proc.wait())
+        else:
+            await proc.wait()
 
     def decode(self, fin: str):
         proc = subprocess.Popen([C.path.wvunpack, '-yq', _resolve_pathstr(fin), "-"], stdout=subprocess.PIPE)

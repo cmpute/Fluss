@@ -1,4 +1,5 @@
 from typing import Callable, List, Union
+import asyncio
 
 import mutagen
 from fluss import codecs
@@ -19,12 +20,13 @@ def _get_codec(filename: Union[str, Path], codec: str = None) -> codecs.AudioCod
         codec_t = codecs.codec_from_filename(filename)
         return codec_t()
 
-def merge_tracks(files_in: List[Union[str, Path]],
-                 file_out: Union[str, Path],
-                 cuesheet: Union[str, Path, Cuesheet] = None,
-                 meta: DiscMeta = None,
-                 codec_out: str = None,
-                 dry_run: bool = False):
+async def merge_tracks(files_in: List[Union[str, Path]],
+                       file_out: Union[str, Path],
+                       cuesheet: Union[str, Path, Cuesheet] = None,
+                       meta: DiscMeta = None,
+                       codec_out: str = None,
+                       progress_callback: Callable[[float], None] = None,
+                       dry_run: bool = False):
     '''
     Generated metadata will be returned
 
@@ -62,8 +64,8 @@ def merge_tracks(files_in: List[Union[str, Path]],
     streams = []
     for idx, file in enumerate(files_in):
         codec_t = codecs.codec_from_filename(file)
-        codec = codec_t()
-        mutag = codec.mutagen(file)
+        icodec = codec_t()
+        mutag = icodec.mutagen(file)
         track_meta = DiscMeta.from_mutagen(mutag)
         cuesheet.update(track_meta.to_cuesheet(), overwrite=False)
         meta.update(track_meta, overwrite=False)
@@ -79,7 +81,7 @@ def merge_tracks(files_in: List[Union[str, Path]],
 
         # update offset
         if not dry_run:
-            streams.append(codec.decode(file))
+            streams.append(icodec.decode(file))
         if cur_track.index00 is not None:
             if cur_track.index00 >= 0:
                 cur_track.index00 += offset
@@ -106,33 +108,34 @@ def merge_tracks(files_in: List[Union[str, Path]],
     meta.cuesheet = cuesheet
 
     # convert audio
-    codec_out = _get_codec(file_out, codec_out)
+    ocodec = _get_codec(file_out, codec_out)
     if not dry_run:
         buf = BytesIO()
         codecs.merge_streams(streams, buf)
 
-        codec_out.encode(file_out, buf.getvalue())
-        mutag = codec_out.mutagen(file_out)
+        await ocodec.encode_async(file_out, buf.getvalue(), progress_callback)
+        mutag = ocodec.mutagen(file_out)
         meta.to_mutagen(mutag)
         mutag.save()
 
     return meta
 
-def convert_track(file_in: Union[str, Path],
-                  file_out: Union[str, Path],
-                  meta: DiscMeta = None,
-                  codec_out: str = None,
-                  dry_run: bool = False):
+async def convert_track(file_in: Union[str, Path],
+                        file_out: Union[str, Path],
+                        meta: DiscMeta = None,
+                        codec_out: str = None,
+                        progress_callback: Callable[[float], None] = None,
+                        dry_run: bool = False):
     '''
     Convert audio file and preserve meta data
     '''
 
-    codec_in = _get_codec(file_in)
-    codec_out = _get_codec(file_out, codec_out)
+    icodec = _get_codec(file_in)
+    ocodec = _get_codec(file_out, codec_out)
 
     if not dry_run:
-        meta = DiscMeta.from_mutagen(codec_in.mutagen(file_in))
-        wave_in = codec_in.decode(file_in)
-        codec_out.encode(file_out, wave_in)
+        meta = DiscMeta.from_mutagen(icodec.mutagen(file_in))
+        wave_in = icodec.decode(file_in)
+        await ocodec.encode_async(file_out, wave_in, progress_callback)
         wave_in.close()
-        meta.to_mutagen(codec_out.mutagen(file_out))
+        meta.to_mutagen(ocodec.mutagen(file_out))

@@ -1,6 +1,7 @@
 from pathlib import Path, PurePath
-from typing import List, Union
+from typing import Callable, List, Union
 from io import BytesIO
+from queue import Queue
 from shutil import copy2 as copy
 
 from fluss.config import global_config
@@ -33,19 +34,19 @@ class OrganizeTarget:
         ''' output file name'''
         raise NotImplementedError("Abstract property!")
 
-    def apply_stream(self, input_root: Path = None) -> BytesIO:
+    async def apply_stream(self, input_root: Path = None) -> BytesIO:
         ''' execute target to BytesIO
         Should return the generated binary data
         '''
         raise NotImplementedError("Abstract property!")
 
-    def apply(self, input_root: Path, output_root: Path) -> None:
+    async def apply(self, input_root: Path, output_root: Path) -> None:
         ''' execute target
         input_root is used when input is str
         output_root is used when this target is not marked as temporary
         Should return the path to result file
         '''
-        data = self.apply_stream(input_root)
+        data = await self.apply_stream(input_root)
         Path(output_root, self.output_name).write_bytes(data.getvalue())
 
 
@@ -88,10 +89,10 @@ class CopyTarget(OrganizeTarget):
     def __repr__(self):
         return "<CopyTarget output=%s>" % self.output_name
 
-    def apply(self, input_root, output_root):
+    async def apply(self, input_root, output_root):
         copy(Path(input_root, self._input[0]), Path(output_root, self._outname))
 
-    def apply_stream(self, input_root):
+    async def apply_stream(self, input_root):
         return BytesIO(Path(input_root, self._input[0]).read_bytes())
 
 class TranscodeTrackTarget(OrganizeTarget):
@@ -192,24 +193,26 @@ class MergeTracksTarget(OrganizeTarget):
     def __repr__(self):
         return "<MergeTracksTarget output=%s>" % self.output_name
 
-    def apply(self, input_root, output_root):
+    async def apply(self, input_root, output_root, progress_callback: Callable[[float], None] = None):
         if self._cover:
             self._meta.cover = Path(input_root, self._cover).read_bytes()
 
         if len(self._tracks) == 1:
-            convert_track(
+            await convert_track(
                 Path(input_root, self._tracks[0]),
                 Path(output_root, self.output_name),
-                meta=self._meta
+                meta=self._meta,
+                progress_callback=progress_callback
             )
         else:
-            merge_tracks(
+            await merge_tracks(
                 [Path(input_root, f) for f in self._tracks],
                 Path(output_root, self.output_name),
-                meta=self._meta
+                meta=self._meta,
+                progress_callback=progress_callback
             )
 
-    def apply_stream(self, input_root):
+    async def apply_stream(self, input_root):
         # TODO: apply and then read
         pass
 
@@ -247,7 +250,7 @@ class TranscodeTextTarget(OrganizeTarget):
     def output_name(self):
         return self._outname
 
-    def apply_stream(self, input_root):
+    async def apply_stream(self, input_root):
         content = Path(input_root, self._input[0]).read_bytes(encoding=self._encoding, errors="replace")
         return BytesIO(content.encode('utf-8-sig'))
 
