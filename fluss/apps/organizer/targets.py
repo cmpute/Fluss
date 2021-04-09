@@ -5,7 +5,7 @@ from queue import Queue
 from shutil import copy2 as copy
 
 from fluss.config import global_config
-from fluss.codecs import codec_from_name, codec_from_filename
+from fluss.codecs import codec_from_name
 from fluss.meta import DiscMeta
 from fluss.utils import merge_tracks, convert_track
 
@@ -151,7 +151,7 @@ class MergeTracksTarget(OrganizeTarget):
             suffix = _split_name(fin)[1]
             if not suffix:
                 unknown_files.append(fin)
-            elif suffix in global_config.audio_codecs:
+            elif suffix in set(c.suffix for c in codec_from_name.values()):
                 audio_files.append(fin)
             elif suffix == 'cue':
                 if cue_file is None:

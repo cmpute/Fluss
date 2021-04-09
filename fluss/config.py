@@ -3,9 +3,11 @@ import addict
 global_config = addict.Dict()
 
 # path to encoders and decoders
-global_config.path.wavpack = r"D:\Github\fluss\codecs\wavpack_x64.exe"
+global_config.path.wavpack = r"D:\Github\fluss\codecs\wavpack.exe"
 global_config.path.wvunpack = r"D:\Github\fluss\codecs\wvunpack.exe"
-global_config.path.flac = r"D:\Github\fluss\codecs\flac_x64.exe"
+global_config.path.flac = r"D:\Github\fluss\codecs\flac.exe"
+global_config.path.mac = r"D:\Github\fluss\codecs\mac.exe"
+global_config.path.tta = r"D:\Github\fluss\codecs\tta_sse4.exe"
 
 # encoder preset configs
 global_config.audio_codecs.wavpack.type = "wavpack"

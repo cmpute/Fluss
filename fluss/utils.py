@@ -81,7 +81,9 @@ async def merge_tracks(files_in: List[Union[str, Path]],
 
         # update offset
         if not dry_run:
-            streams.append(icodec.decode(file))
+            wave_in = await icodec.decode_async(file,
+                progress_callback=lambda p: progress_callback(p + idx * 0.5 / len(files_in)))
+            streams.append(wave_in)
         if cur_track.index00 is not None:
             if cur_track.index00 >= 0:
                 cur_track.index00 += offset
@@ -113,7 +115,8 @@ async def merge_tracks(files_in: List[Union[str, Path]],
         buf = BytesIO()
         codecs.merge_streams(streams, buf)
 
-        await ocodec.encode_async(file_out, buf.getvalue(), progress_callback)
+        await ocodec.encode_async(file_out, buf.getvalue(),
+            progress_callback=lambda p: progress_callback(p + 0.5))
         mutag = ocodec.mutagen(file_out)
         meta.to_mutagen(mutag)
         mutag.save()
@@ -135,7 +138,18 @@ async def convert_track(file_in: Union[str, Path],
 
     if not dry_run:
         meta = DiscMeta.from_mutagen(icodec.mutagen(file_in))
-        wave_in = icodec.decode(file_in)
-        await ocodec.encode_async(file_out, wave_in, progress_callback)
-        wave_in.close()
+        wave_in = await icodec.decode_async(file_in,
+            progress_callback=lambda p: progress_callback(p / 2))
+
+        # get absolute data
+        buf = wave_in.getfp().file
+        if isinstance(buf, BytesIO):
+            data = buf.getvalue()
+        else:
+            buf.seek(0)
+            data = buf.read()
+            buf.close()
+
+        await ocodec.encode_async(file_out, data,
+            progress_callback=lambda p: progress_callback(p / 2 + 0.5))
         meta.to_mutagen(ocodec.mutagen(file_out))
