@@ -297,25 +297,33 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         elif len(partnumbers) == 1:
             self.txt_partnumber.setPlaceholderText(partnumbers[0])
 
+    @asyncSlot()
+    async def editCurrentTarget(self):
+        await editTarget(
+            self.currentOutputList[self.currentOutputListView.currentIndex().row()],
+            input_root=self._input_folder,
+            output_root=Path(self.txt_output_path.text(), self.tab_folders.tabText(self.tab_folders.currentIndex()))
+        )
+        self.fillMetaFromFolder()
+
     def outputContextMenu(self, listview: QListView, pos: QPoint):
         current_model = listview.model()
         menu = QMenu()
         edit_action = QAction("Edit clicked" if len(listview.selectedIndexes()) > 1 else "Edit", menu)
-        edit_action.triggered.connect(lambda: editTarget(
-            current_model[listview.currentIndex().row()],
-            input_root=self._input_folder,
-            output_root=Path(self.txt_output_path.text(), self.tab_folders.tabText(self.tab_folders.currentIndex()))
-        ) or self.fillMetaFromFolder())
+        edit_action.triggered.connect(self.editCurrentTarget)
         menu.addAction(edit_action)
+
         delete_action = QAction("Remove", menu)
         delete_action.triggered.connect(lambda: current_model.__delitem__(
             [i.row() for i in listview.selectedIndexes()]
         ))
         menu.addAction(delete_action)
+
+        selected_istemp = current_model[listview.currentIndex().row()].temporary
         mark_temp_action = QAction("Mark temp", menu)
         mark_temp_action.setCheckable(True)
-        mark_temp_action.setChecked(current_model[listview.currentIndex().row()].temporary)
-        mark_temp_action.triggered.connect(lambda: [current_model[i.row()].switch_temporary()
+        mark_temp_action.setChecked(selected_istemp)
+        mark_temp_action.triggered.connect(lambda: [current_model[i.row()].switch_temporary(not selected_istemp)
             for i in listview.selectedIndexes()])
         menu.addAction(mark_temp_action)
 

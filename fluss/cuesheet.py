@@ -142,6 +142,34 @@ class Cuesheet:
                     cue.files[file][track.track_number].index01 += track.start_offset + index.index_offset
         return cue
 
+    def to_flac(self) -> flac.CueSheet:
+        '''
+        Dump the cuesheet data to flac format
+        '''
+        cue = flac.CueSheet(None)
+
+        if len(self.files) > 1:
+            raise ValueError("Only cuesheet with single file section is able to be converted to flac cuesheet!")
+
+        for f, tracks in self.files.items():
+            for i, track in tracks.items():
+                indexes = []
+                if track.index00 is not None:
+                    start_offset = track.index00
+                    indexes.append(flac.CueSheetTrackIndex(0, 0))
+                    if track.index01 is not None:
+                        indexes.append(flac.CueSheetTrackIndex(1, track.index01 - track.index00))
+                elif track.index01 is not None:
+                    start_offset = track.index01
+                    indexes.append(flac.CueSheetTrackIndex(1, 0))
+
+                flac_track = flac.CueSheetTrack(i, start_offset)
+                flac_track.isrc = track.isrc
+                flac_track.indexes.extend(indexes)
+                cue.tracks.append(flac_track)
+
+        return cue
+
     @classmethod
     def from_mutagen(cls, tag: Union[flac.FLAC, Tags]) -> "Cuesheet":
         if isinstance(tag, flac.FLAC):
@@ -254,7 +282,9 @@ class Cuesheet:
             lines.append(f'PERFORMER "{self.performer}"')
         for file, tracks in self.files.items():
             lines.append(f'FILE "{file}" WAVE')
-            for idx, tr in tracks.items():
+            sorted_tracks = list(tracks.items())
+            sorted_tracks.sort(key=lambda t: t[0])
+            for idx, tr in sorted_tracks:
                 lines.append(f"  TRACK {idx:02} AUDIO")
                 if tr.title is not None:
                     lines.append(f'    TITLE "{tr.title}"')

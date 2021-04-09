@@ -86,8 +86,33 @@ class flac(AudioCodec):
         assert Path(C.path.flac).exists()
 
     def encode(self, fout: str, wavein: bytes) -> None:
-        proc = subprocess.Popen([C.path.flac, "-sV", "-", "-o", _resolve_pathstr(fout)] + self.encode_args, stdin=subprocess.PIPE)
+        proc = subprocess.Popen([C.path.flac, "-sfV", "-", "-o", _resolve_pathstr(fout)] + self.encode_args, stdin=subprocess.PIPE)
         proc.communicate(wavein)
+
+    async def encode_async(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None] = None) -> None:
+        if progress_callback is None:
+            args = [C.path.flac, "-sfV", "-", "-o", _resolve_pathstr(fout)] + self.encode_args
+            stderr = None
+        else:
+            args = [C.path.flac, "-fV", "-", "-o", _resolve_pathstr(fout)] + self.encode_args
+            stderr = subprocess.PIPE
+
+        proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.PIPE, stderr=stderr)
+
+        if progress_callback is not None:
+            ptask = self._report_encode_progress(proc.stderr,
+                                                 pattern=b'1?[0-9]{0,2}(?=% complete)',
+                                                 convert=lambda s: int(s) / 100,
+                                                 callback=progress_callback,
+                                                 linesep=b'ratio')
+
+        proc.stdin.write(wavein)
+        proc.stdin.close()
+
+        if progress_callback is not None:
+            await asyncio.gather(ptask, proc.wait())
+        else:
+            await proc.wait()
 
     def decode(self, fin: str) -> wave.Wave_read:
         proc = subprocess.Popen([C.path.flac, "-sdc", _resolve_pathstr(fin)], stdout=subprocess.PIPE)

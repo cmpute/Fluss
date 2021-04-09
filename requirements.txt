@@ -3,4 +3,5 @@ mutagen
 chardet
 networkx
 parse
+pillow
 qasync

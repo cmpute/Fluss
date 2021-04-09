@@ -1,5 +1,4 @@
 
-from parse import parse
 import re
 import typing
 from pathlib import Path
@@ -9,18 +8,20 @@ from fluss.codecs import codec_from_filename, codec_from_name
 from fluss.config import global_config
 from fluss.meta import Cuesheet, DiscMeta, TrackMeta
 from networkx import DiGraph
-from PySide6.QtCore import (QAbstractListModel, QAbstractTableModel, QMimeData,
-                            QModelIndex, Qt, QItemSelection, QItemSelectionModel)
+from parse import parse
+from PySide6.QtCore import (QAbstractListModel, QAbstractTableModel,
+                            QItemSelection, QItemSelectionModel, QMimeData,
+                            QModelIndex, Qt)
 from PySide6.QtGui import QBrush, QColor, QDropEvent, QResizeEvent
 from PySide6.QtWidgets import (QApplication, QDialog, QFrame, QHeaderView,
                                QLabel, QLineEdit, QListView, QListWidget,
-                               QWidget, QTableView, QProxyStyle, QStyleOption)
+                               QProxyStyle, QStyleOption, QTableView, QWidget)
 
-from .edit_merge_tracks_ui import Ui_MergeTracksTargetDialog
 from .edit_copy_target_ui import Ui_CopyTargetDialog
+from .edit_merge_tracks_ui import Ui_MergeTracksTargetDialog
 from .edit_transcode_target_ui import Ui_TranscodeTargetDialog
 from .edit_transcode_text_target_ui import Ui_TranscodeTextTargetDialog
-from .targets import (MergeTracksTarget, CopyTarget, OrganizeTarget,
+from .targets import (CopyTarget, MergeTracksTarget, OrganizeTarget,
                       TranscodePictureTarget, TranscodeTextTarget,
                       TranscodeTrackTarget)
 
@@ -393,8 +394,7 @@ class TrackTableModel(QAbstractTableModel):
             self.relocateRows(from_index, to_index)
             return True
         else:
-            return False
-        return super().dropMimeData(data, action, row, column, parent)
+            return super().dropMimeData(data, action, row, column, parent)
 
 def editCopyTarget(self: CopyTarget, input_root: Path = None, output_root: Path = None):
     dialog = QDialog()
@@ -403,10 +403,12 @@ def editCopyTarget(self: CopyTarget, input_root: Path = None, output_root: Path 
     layout.setupUi(dialog)
     layout.retranslateUi(dialog)
     layout.txt_outname.setText(self._outname)
+    layout.check_temporary.setChecked(self.temporary)
     if dialog.exec_():
         self._outname = layout.txt_outname.text()
+        self.temporary = layout.check_temporary.isChecked()
 
-def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None, output_root: Path = None):
+async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None, output_root: Path = None):
     dialog = QDialog()
     dialog.setWindowIcon(_get_icon())
     layout = Ui_MergeTracksTargetDialog()
@@ -443,8 +445,9 @@ def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None, outp
                 cs = Cuesheet.from_file(input_root / self._cue)
             else: # isinstance(self._cue, OrganizeTarget):
                 assert isinstance(self._cue, (CopyTarget, TranscodeTextTarget))
-                cs = Cuesheet.parse(self._cue.apply_stream(input_root).getvalue().decode('utf-8-sig'))
-            self._meta.update(DiscMeta.from_cuesheet(self._cue))
+                cs = await self._cue.apply_stream(input_root)
+                cs = Cuesheet.parse(cs.getvalue().decode('utf-8-sig'))
+            self._meta.update(DiscMeta.from_cuesheet(cs))
 
         cue_from_file = False
         for i, track in enumerate(self._tracks):
@@ -454,7 +457,7 @@ def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None, outp
             if cs:
                 if cue_from_file:
                     raise ValueError("Multiple built-in cuesheet found!")
-                self._meta.update(DiskMeta(from_cuesheet(cs)))
+                self._meta.update(DiscMeta.from_cuesheet(cs))
                 cue_from_file = True
 
             # Extract other files
@@ -535,9 +538,9 @@ def editTranscodePictureTarget(self: TranscodePictureTarget, input_root: Path = 
             self._outstem = self._outstem[:-len(suffix)-1]
         self._codec = codec
 
-def editTarget(target: OrganizeTarget, input_root: Path = None, output_root: Path = None):
+async def editTarget(target: OrganizeTarget, input_root: Path = None, output_root: Path = None):
     if isinstance(target, MergeTracksTarget):
-        editMergeTracksTarget(target, input_root, output_root)
+        await editMergeTracksTarget(target, input_root, output_root)
     elif isinstance(target, CopyTarget):
         editCopyTarget(target, input_root, output_root)
     elif isinstance(target, TranscodePictureTarget):

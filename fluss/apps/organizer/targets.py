@@ -22,8 +22,11 @@ class OrganizeTarget:
             self._input = input_files
         self.temporary = False
 
-    def switch_temporary(self) -> None:
-        self.temporary = not self.temporary
+    def switch_temporary(self, value: bool = None) -> None:
+        if value is None:
+            self.temporary = not self.temporary
+        else:
+            self.temporary = value
 
     @classmethod
     def validate(self, input_files: List[Union[str, "OrganizeTarget"]]) -> bool:
@@ -167,8 +170,8 @@ class MergeTracksTarget(OrganizeTarget):
 
     @classmethod
     def validate(cls, input_files):
-        _, _, _, unknown_files = MergeTracksTarget._sort_files(input_files)
-        return len(unknown_files) == 0
+        track_files, _, _, unknown_files = MergeTracksTarget._sort_files(input_files)
+        return len(unknown_files) == 0 and len(track_files) > 0
 
     def _default_output_name(self):
         if self._meta and self._meta.partnumber:
@@ -219,7 +222,7 @@ class MergeTracksTarget(OrganizeTarget):
 class TranscodeTextTarget(OrganizeTarget):
     ''' Support text encoding fixing '''
     description = "Transcode Text"
-    valid_encodings = ['utf-8', 'utf-8-sig', 'gb2312', 'big5', 'gbk', 'shift_jis']
+    valid_encodings = ['utf-8', 'utf-8-sig', 'gb2312', 'gbk', 'big5', 'big5hkscs', 'shift_jis', 'euc_jp']
     valid_file_types = ['txt', 'log', 'cue']
 
     def __init__(self, input_files, encoding="utf-8"):
@@ -251,7 +254,7 @@ class TranscodeTextTarget(OrganizeTarget):
         return self._outname
 
     async def apply_stream(self, input_root):
-        content = Path(input_root, self._input[0]).read_bytes(encoding=self._encoding, errors="replace")
+        content = Path(input_root, self._input[0]).read_text(encoding=self._encoding, errors="replace")
         return BytesIO(content.encode('utf-8-sig'))
 
     def __str__(self):

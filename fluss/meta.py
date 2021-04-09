@@ -1,9 +1,12 @@
 from collections import defaultdict
 from typing import List, Set, Dict
+from io import BytesIO
+from PIL import Image
 import mutagen
-from mutagen.flac import FLAC
+from mutagen.flac import FLAC, Picture
 from mutagen.apev2 import APEv2, APEv2File
 from mutagen.id3 import ID3, ID3FileType, PictureType
+from fluss import cuesheet
 from fluss.cuesheet import Cuesheet, CuesheetTrack, _default_cuesheet_file
 
 def assert_field(v1, v2, field_name):
@@ -163,12 +166,11 @@ class DiscMeta:
                 return None
             value = flac_meta.tags[name][0]
             return value or None
-        if get_first('ALBUM'):
-            meta.title = get_first('ALBUM')
-        if 'ALBUMARTIST' in flac_meta:
+        meta.title = get_first('ALBUM')
+        if 'ALBUMARTIST' in flac_meta.tags:
             meta.artists.update((a for a in flac_meta.tags.get('ALBUMARTIST') if a))
-        if get_first('DATE'):
-            meta.date = get_first('DATE')
+        meta.date = get_first('DATE')
+
         track_idx_str = get_first('TRACKNUMBER')
         if track_idx_str: # This is an flac for single track
             if '/' in track_idx_str:
@@ -181,8 +183,17 @@ class DiscMeta:
             meta._reserve_tracks(reserved_idx)
             meta.tracks[track_idx-1] = TrackMeta.from_flac(flac_meta)
 
+        # get cuesheet
         if flac_meta.cuesheet:
             meta._cuesheet = Cuesheet.from_flac(flac_meta.cuesheet)
+        if 'CUESHEET' in flac_meta.tags:
+            cs = Cuesheet.parse(get_first('CUESHEET'))
+            if meta._cuesheet:
+                meta._cuesheet.update(cs)
+            else:
+                meta._cuesheet = cs
+
+        # get cover
         if flac_meta.pictures:
             for pic in flac_meta.pictures:
                 if pic.type == PictureType.COVER_FRONT:
@@ -276,7 +287,32 @@ class DiscMeta:
         return ', '.join(self.artists) if self.artists else None
 
     def to_flac(self, flac_meta: FLAC):
-        raise NotImplementedError("Convert metadata to FLAC is not implemented!")
+        def add_if_exist(obj, tag_key):
+            if obj:
+                flac_meta.tags[tag_key] = obj
+
+        add_if_exist(self.title, 'ALBUM')
+        add_if_exist(self.genre, 'GENRE')
+        add_if_exist(self.date, 'DATE')
+        if self.artists:
+            flac_meta.tags['ALBUMARTIST'] = list(self.artists)
+
+        if self.cover:
+            image = Image.open(BytesIO(self.cover))
+            pic = Picture()
+            pic.type = PictureType.COVER_FRONT
+            pic.data = self.cover
+            pic.mime = Image.MIME[image.format]
+            pic.width = image.width
+            pic.height = image.height
+            flac_meta.add_picture(pic)
+
+        if self.cuesheet:
+            flac_meta.cuesheet = self.cuesheet.to_flac()
+            if self.cuesheet:
+                flac_meta.tags['CUESHEET'] = str(self.cuesheet)
+                add_if_exist(self.cuesheet.catalog, 'Catalog')
+                add_if_exist(self.cuesheet.rems.get('COMMENT', None), 'Comment')
 
     def to_id3(self, id3_meta: ID3):
         raise NotImplementedError("Convert metadata to FLAC is not implemented!")
@@ -296,9 +332,9 @@ class DiscMeta:
         add_if_exist(self.date, 'Year')
         if self.cuesheet:
             ape_meta.tags['Cuesheet'] = str(self.cuesheet)
-            if self.cuesheet.catalog:
-                add_if_exist(self.cuesheet.catalog, 'Catalog')
-                add_if_exist(self.cuesheet.rems.get('UPC', None), 'UPC')
+            add_if_exist(self.cuesheet.catalog, 'Catalog')
+            add_if_exist(self.cuesheet.rems.get('UPC', None), 'UPC')
+            add_if_exist(self.cuesheet.rems.get('COMMENT', None), 'Comment')
 
     def to_mutagen(self, mutagen_file: mutagen.FileType):
         if isinstance(mutagen_file, FLAC):
