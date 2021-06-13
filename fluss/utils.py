@@ -131,6 +131,8 @@ def convert_track(file_in: Union[str, Path],
     codec_out = _get_codec(file_out, codec_out)
 
     if not dry_run:
+        buf = BytesIO()
+        codecs.merge_streams([codec_in.decode(file_in)], buf)
         meta = DiscMeta.from_mutagen(codec_in.mutagen(file_in))
-        codec_out.encode(file_out, codec_in.decode(file_in))
+        codec_out.encode(file_out, buf.getvalue())
         meta.to_mutagen(codec_out.mutagen(file_out))

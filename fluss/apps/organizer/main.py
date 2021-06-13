@@ -436,6 +436,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         for f in files_to_remove:
             f.unlink()
+
+        # TODO: add meta.yaml output
         self.statusbar.showMessage("Organizing done successfully!")
 
 def entry():

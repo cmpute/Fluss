@@ -91,7 +91,7 @@ class TargetListModel(QAbstractListModel):
             prefix = '*' if target.temporary else ''
             if isinstance(target, CopyTarget):
                 return prefix + target.output_name + " (copy)"
-            elif isinstance(target, (TranscodeTextTarget, TranscodePictureTarget)):
+            elif isinstance(target, (TranscodeTextTarget, TranscodePictureTarget, TranscodeTrackTarget)):
                 return prefix + target.output_name + " (recode)"
             elif isinstance(target, MergeTracksTarget):
                 return prefix + target.output_name + " (convert)"
@@ -184,6 +184,8 @@ class KeywordPanel(QWidget):
 
     def extendKeywords(self, keywords: List[str]):
         for kw in keywords:
+            if not kw.strip(): # skip empty string
+                continue
             self._keywords.append(kw)
 
             label = QLabel(kw, self)
@@ -207,15 +209,17 @@ class KeywordPanel(QWidget):
         leftMargin = rightMargin = 5
         x = leftMargin
         y = rowPadding
+        nrows = 1
         for label in self._labels:
             if x + label.width() + rightMargin > self.width():
                 x = leftMargin
                 y += label.height() + rowPadding
+                nrows += 1
             label.move(x, y)
             x += label.width() + colPadding
 
         if len(self._labels) > 0:
-            self.setMinimumHeight(self._labels[0].height() + rowPadding * 2)
+            self.setMinimumHeight(self._labels[0].height() * nrows + rowPadding * 2)
 
     def clear(self):
         for label in self._labels:
@@ -498,7 +502,7 @@ def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None, outp
         tracks_new = [self._tracks[i] for i in table_model._track_order]
         self._tracks = tracks_new
 
-def editTranscodeTextTarget(self: TranscodeTextTarget, input_root: Path = None, output_root=None):
+def editTranscodeTextTarget(self: TranscodeTextTarget, input_root: Path = None, output_root: Path = None):
     assert isinstance(self._input[0], str), "Only support reading from file by now!"
 
     dialog = QDialog()
@@ -535,6 +539,24 @@ def editTranscodePictureTarget(self: TranscodePictureTarget, input_root: Path = 
             self._outstem = self._outstem[:-len(suffix)-1]
         self._codec = codec
 
+def editTranscodeTrackTarget(self: TranscodeTrackTarget, input_root: Path = None, output_root: Path = None):
+    dialog = QDialog()
+    dialog.setWindowIcon(_get_icon())
+    layout = Ui_TranscodeTargetDialog()
+    layout.setupUi(dialog)
+    layout.retranslateUi(dialog)
+    layout.txt_outname.setText(self._outstem)
+
+    codecs_names = [f".{v.type} ({c})" for c, v in global_config.audio_codecs.items()]
+    layout.cbox_suffix.addItems(codecs_names)
+    layout.cbox_suffix.setCurrentText(f".{global_config.audio_codecs[self._codec].type }({self._codec})")
+    if dialog.exec_():
+        suffix, codec = parse(".{} ({})", layout.cbox_suffix.currentText())
+        self._outstem = layout.txt_outname.text()
+        if self._outstem.endswith(suffix):
+            self._outstem = self._outstem[:-len(suffix)-1]
+        self._codec = codec
+
 def editTarget(target: OrganizeTarget, input_root: Path = None, output_root: Path = None):
     if isinstance(target, MergeTracksTarget):
         editMergeTracksTarget(target, input_root, output_root)
@@ -544,5 +566,7 @@ def editTarget(target: OrganizeTarget, input_root: Path = None, output_root: Pat
         editTranscodePictureTarget(target, input_root, output_root)
     elif isinstance(target, TranscodeTextTarget):
         editTranscodeTextTarget(target, input_root, output_root)
+    elif isinstance(target, TranscodeTrackTarget):
+        editTranscodeTrackTarget(target, input_root, output_root)
     else:
         raise ValueError("Invalid target type for editing!")
