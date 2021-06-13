@@ -209,8 +209,8 @@ class MergeTracksTarget(OrganizeTarget):
 
     @classmethod
     def validate(cls, input_files):
-        _, _, _, unknown_files = MergeTracksTarget._sort_files(input_files)
-        return len(unknown_files) == 0
+        tracks, _, _, unknown_files = MergeTracksTarget._sort_files(input_files)
+        return len(tracks) > 0 and len(unknown_files) == 0
 
     def _default_output_name(self):
         if self._meta and self._meta.partnumber:
@@ -338,11 +338,17 @@ class TranscodePictureTarget(OrganizeTarget):
     def __repr__(self):
         return "<TranscodePictureTarget output=%s>" % self.output_name
 
-class CropPictureTarget(OrganizeTarget):
+class CropPictureTarget(TranscodePictureTarget):
     ''' Support cover cropping '''
     description = "Crop Image"
 
-    # TODO: support this
+    def __init__(self, input_files, codec=global_config.organizer.output_codec.image):
+        super().__init__(input_files, codec)
+        self._outstem = "cover" # default name is cover
+        self._centerx = None
+        self._centery = None
+        self._scale = None
+        self._rotation = None
 
 target_types = [
     CopyTarget,
