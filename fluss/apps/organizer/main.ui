@@ -780,7 +780,18 @@
           </layout>
          </item>
          <item>
-          <widget class="KeywordPanel" name="widget_keywords" native="true"/>
+          <widget class="QScrollArea" name="scrollArea">
+           <property name="horizontalScrollBarPolicy">
+            <enum>Qt::ScrollBarAlwaysOff</enum>
+           </property>
+           <property name="widgetResizable">
+            <bool>true</bool>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+           </property>
+           <widget class="KeywordPanel" name="widget_keywords"/>
+          </widget>
          </item>
         </layout>
        </widget>

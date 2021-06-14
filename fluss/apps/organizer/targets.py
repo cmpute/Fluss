@@ -101,7 +101,50 @@ class CopyTarget(OrganizeTarget):
 class TranscodeTrackTarget(OrganizeTarget):
     ''' Support recoding single audio files '''
     description = "Transcode Tracks"
-    # TODO: implement track conversion (This is useful for DSD)
+
+    def __init__(self, input_files, codec=global_config.organizer.output_codec.audio):
+        super().__init__(input_files)
+
+        self._outstem = "" # empty means using default name
+        if codec in global_config.audio_codecs:
+            self._codec = codec
+        else:
+            self._codec = global_config.organizer.output_codec.audio
+
+        if isinstance(self._input[0], str):
+            self._outstem = PurePath(self._input[0]).stem
+        elif isinstance(self._input[0], OrganizeTarget):
+            self._outstem = self._input[0].output_name.rsplit('.', 1)[0]
+        else:
+            raise ValueError("Incorrect input type!")
+
+    @classmethod
+    def validate(cls, input_files):
+        if len(input_files) != 1:
+            return False
+        suffix = _split_name(input_files[0])[1]
+        if suffix not in global_config.audio_codecs:
+            return False
+        return True
+
+    @property
+    def output_name(self):
+        fname = self._outstem
+        codec_cls = codec_from_name[global_config.audio_codecs[self._codec].type]
+        return fname + "." + codec_cls.suffix
+
+    def __str__(self):
+        return "Converting track into %s" % self.output_name
+
+    def __repr__(self):
+        return "<TranscodeTrackTarget output=%s>" % self.output_name
+
+    def apply(self, input_root, output_root):
+        convert_track(
+            Path(input_root, self._input[0]),
+            Path(output_root, self.output_name)
+        )
+
 
 class MergeTracksTarget(OrganizeTarget):
     ''' Support recoding, merging, embedding cue and embedding cover
@@ -301,11 +344,17 @@ class TranscodePictureTarget(OrganizeTarget):
     def __repr__(self):
         return "<TranscodePictureTarget output=%s>" % self.output_name
 
-class CropPictureTarget(OrganizeTarget):
+class CropPictureTarget(TranscodePictureTarget):
     ''' Support cover cropping '''
     description = "Crop Image"
 
-    # TODO: support this
+    def __init__(self, input_files, codec=global_config.organizer.output_codec.image):
+        super().__init__(input_files, codec)
+        self._outstem = "cover" # default name is cover
+        self._centerx = None
+        self._centery = None
+        self._scale = None
+        self._rotation = None
 
 target_types = [
     CopyTarget,

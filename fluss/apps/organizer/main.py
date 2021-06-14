@@ -1,29 +1,34 @@
 import asyncio
+import os
+import re
 import sys
-import re, os
-from queue import Queue
-from os.path import commonprefix
+from collections import defaultdict
 from itertools import islice
+from os.path import commonprefix
 from pathlib import Path
-from typing import List, Dict, Union
-from qasync import QEventLoop, asyncSlot
+from queue import Queue
+from typing import Dict, List, Union
 
 from addict import Dict as edict
+from dateutil.parser import parse as date_parse
 from fluss.config import global_config
 from fluss.meta import AlbumMeta, FolderMeta
 from networkx import DiGraph, topological_sort
-from PySide6.QtCore import QModelIndex, QObject, QPoint, QSize, QTimer, Qt, QUrl, Signal, QThread
+from PySide6.QtCore import (QModelIndex, QObject, QPoint, QSize, Qt, QThread,
+                            QTimer, QUrl, Signal)
 from PySide6.QtGui import (QAction, QBrush, QColor, QContextMenuEvent,
                            QDesktopServices, QIcon, QKeyEvent)
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog,
                                QFrame, QLabel, QListView, QListWidget,
                                QListWidgetItem, QMainWindow, QMenu,
                                QMessageBox, QProgressBar)
+from qasync import QEventLoop, asyncSlot
 
 from . import main_rc
 from .main_ui import Ui_MainWindow
-from .targets import target_types, MergeTracksTarget, OrganizeTarget
-from .widgets import _get_icon, TargetListModel, PRED_COLOR, USED_COLOR, editTarget
+from .targets import MergeTracksTarget, OrganizeTarget, target_types
+from .widgets import (PRED_COLOR, USED_COLOR, TargetListModel, _get_icon,
+                      editTarget)
 
 # TODO: add help (as below)
 # - you can drag file from input to output by pressing alt
@@ -37,8 +42,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._shared_states = edict(hovered=None)
         self._enable_cross_selection = False
         self._meta = None
+        self._placeholders = defaultdict(edict) # save placeholder text for folder-specific fields
         self._last_tab_index = None
         self._executing = False
+        self._status_owner = None
 
         self.setupUi(self)
         self.retranslateUi(self)
@@ -46,7 +53,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # load resources
         self.setWindowIcon(_get_icon())
-        for format in global_config.output_format:
+        for format in global_config.organizer.output_format:
             self.cbox_output_type.addItem(format)
 
         # TODO: For debug
@@ -61,6 +68,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_reset.clicked.connect(lambda: self.txt_input_path.clear() or self.reset())
         self.btn_apply.clicked.connect(lambda: self.statusbar.showMessage("Starting execution..."))
         self.btn_apply.clicked.connect(self.executeTargets)
+        self.btn_apply.enterEvent = self.applyButtonEnter
+        self.btn_apply.leaveEvent = self.applyButtonLeave
         self.txt_input_path.textChanged.connect(self.inputChanged)
         self.list_input_files.itemDoubleClicked.connect(self.previewInput)
         self.list_input_files.itemPressed.connect(self.updateSelectedInput)
@@ -73,6 +82,36 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.btn_expand_meta.setText("Fold Meta" if self.panel_folder_meta.isVisible() else "Expand Meta")
         ))
         self.tab_folders.currentChanged.connect(self.updateSelectedFolder)
+
+    def applyButtonEnter(self, event):
+        self._status_owner = self.btn_apply
+        outpath = Path(self.txt_output_path.text(), self.formattedOutputName)
+        self.statusbar.showMessage("Start conversion to " + str(outpath))
+
+    def applyButtonLeave(self, event):
+        if self._status_owner == self.btn_apply:
+            self.statusbar.clearMessage()
+            self._status_owner = None
+
+    @property
+    def formattedOutputName(self) -> str:
+        if self.cbox_output_type.currentIndex() < 0:
+            return ""
+        if self._meta.date:
+            date = date_parse(self._meta.date)
+            yymmdd = date.strftime("%y%m%d")
+        else:
+            yymmdd = ""
+        name_args = dict(
+            title=self._meta.title or "",
+            artist=self._meta.full_artist or "",
+            yymmdd=yymmdd,
+            partnumber="",
+            event="",
+            collaboration="",
+        )
+        name = global_config.organizer.output_format[self.cbox_output_type.currentText()].format(**name_args)
+        return name.replace("()", "").replace("[]", "").strip()
 
     def listInputViewLeave(self, event):
         self._shared_states.hovered = None
@@ -104,9 +143,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if self._last_tab_index is not None:
             self.flushFolderMeta(self._last_tab_index)
-            # TODO: save and load placeholder text for partnumber
         self._last_tab_index = index
 
+        # update fields
         current_meta = self._meta.folders[self.tab_folders.tabText(index)]
         self.txt_catalog.setText(current_meta.catalog)
         self.txt_partnumber.setText(current_meta.partnumber)
@@ -115,6 +154,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.txt_source.setText(current_meta.source)
         self.txt_ripper.setText(current_meta.ripper)
         self.txt_comment.setPlainText(current_meta.comment)
+
+        # update placeholder text
+        self.txt_partnumber.setPlaceholderText(self._placeholders[self.currentOutputFolder].partnumber or "")
+        self.txt_tool.setPlaceholderText(self._placeholders[self.currentOutputFolder].tool or "")
 
     def flushFolderMeta(self, index: int):
         target_meta = self._meta.folders[self.tab_folders.tabText(index)]
@@ -150,15 +193,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.updateFolderNames()
 
     def removeOutputFolder(self):
-        self._meta.folders.pop(self.tab_folders.tabText(self.tab_folders.currentIndex()))
+        self._placeholders.pop(self.currentOutputFolder)
+        self._meta.folders.pop(self.currentOutputFolder)
         self.tab_folders.removeTab(self.tab_folders.currentIndex())
         self.updateFolderNames()
 
     def updateFolderNames(self):
         # update valid folder names
-        valid_folders = set(['CD', 'BK', 'DVD', 'DL', 'OL', 'MISC', 'PHOTO', 'LRC'])
-        current_folders = set([self.tab_folders.tabText(i) for i in range(self.tab_folders.count())])
-        valid_folders = list(valid_folders.difference(current_folders))
+        valid_folders = ['CD', 'BK', 'DVD', 'DL', 'OL', 'MISC', 'PHOTO', 'LRC']
+        for i in range(self.tab_folders.count()):
+            valid_folders.remove(self.tab_folders.tabText(i))
         self.txt_folder_name.clear()
         self.txt_folder_name.addItems(valid_folders)
 
@@ -173,6 +217,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def updateHighlightInput(self, item: QListWidgetItem):
         self._shared_states.hovered = item.text()
         self.refreshOutputBgcolor()
+
+    @property
+    def currentOutputFolder(self) -> str:
+        return self.tab_folders.tabText(self.tab_folders.currentIndex())
 
     @property
     def currentOutputListView(self) -> QListView:
@@ -275,6 +323,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         comment = target._meta.cuesheet.rems['COMMENT']
                         if 'Exact Audio Copy' in comment:
                             self.txt_tool.setPlaceholderText(comment)
+                            self._placeholders[self.currentOutputList].tool = comment
                         else:
                             self.txt_comment.setPlaceholderText(comment)
                     if target._meta.cuesheet.rems.get('DATE', ''):
@@ -291,18 +340,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 rmin, rmax = min(remain_num), max(remain_num)
                 if rmax - rmin + 1 == len(remain):
                     rlen = len(remain[0])
-                    self.txt_partnumber.setPlaceholderText(prefix + str(rmin).zfill(rlen) + '~' + str(rmax).zfill(rlen))
+                    pnstr = prefix + str(rmin).zfill(rlen) + '~' + str(rmax).zfill(rlen)
+                    self.txt_partnumber.setPlaceholderText(pnstr)
+                    self._placeholders[self.currentOutputFolder].partnumber = pnstr
             except ValueError: # non trivial part numbers
                 pass
         elif len(partnumbers) == 1:
             self.txt_partnumber.setPlaceholderText(partnumbers[0])
+            self._placeholders[self.currentOutputFolder].partnumber = partnumbers[0]
 
     @asyncSlot()
     async def editCurrentTarget(self):
         await editTarget(
             self.currentOutputList[self.currentOutputListView.currentIndex().row()],
             input_root=self._input_folder,
-            output_root=Path(self.txt_output_path.text(), self.tab_folders.tabText(self.tab_folders.currentIndex()))
+            output_root=Path(self.txt_output_path.text(), self.currentOutputFolder)
         )
         self.fillMetaFromFolder()
 

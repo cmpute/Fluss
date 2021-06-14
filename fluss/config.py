@@ -20,10 +20,10 @@ global_config.image_codecs.png.type = "png"
 global_config.image_codecs.jpg.type = "jpg"
 
 # define possible output formats
-global_config.organizer.output_format.indie = ""
-global_config.organizer.output_format.commercial = ""
-global_config.organizer.output_format.acg = ""
-global_config.organizer.output_format.indie_collection = ""
+global_config.organizer.output_format.indie = "[{artist}][{partnumber}][{yymmdd}({event})][{collaboration}] {title}"
+global_config.organizer.output_format.commercial = "[{artist}][{yymmdd}({event})][{partnumber}] {title}"
+global_config.organizer.output_format.acg = "[{yymmdd}({event})][{artist}][{partnumber}] {title}"
+global_config.organizer.output_format.indie_collection = "[{partnumber}][{yymmdd}({event})] {title}"
 
 # define default output codec for various contents
 global_config.organizer.output_codec.image = "png"

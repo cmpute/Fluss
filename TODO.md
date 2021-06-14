@@ -1,1 +1,2 @@
 - [ ] support DSD stream load and save
+- [ ] support rip check by Accurip (CUETools)

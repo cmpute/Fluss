@@ -5,3 +5,4 @@ networkx
 parse
 pillow
 qasync
+python-dateutil

@@ -1,29 +1,33 @@
 
+import math
 import re
 import typing
 from pathlib import Path
 from typing import List, Union
 
+from addict import Dict as edict
 from fluss.codecs import codec_from_filename, codec_from_name
 from fluss.config import global_config
 from fluss.meta import Cuesheet, DiscMeta, TrackMeta
 from networkx import DiGraph
+from networkx.algorithms.distance_measures import center
 from parse import parse
 from PySide6.QtCore import (QAbstractListModel, QAbstractTableModel,
                             QItemSelection, QItemSelectionModel, QMimeData,
-                            QModelIndex, Qt)
-from PySide6.QtGui import QBrush, QColor, QDropEvent, QResizeEvent
-from PySide6.QtWidgets import (QApplication, QDialog, QFrame, QHeaderView,
-                               QLabel, QLineEdit, QListView, QListWidget,
-                               QProxyStyle, QStyleOption, QTableView, QWidget)
+                            QModelIndex, QRect, Qt, Signal)
+from PySide6.QtGui import (QBrush, QColor, QDropEvent, QImage, QKeyEvent,
+                           QMouseEvent, QPen, QPixmap, QResizeEvent,
+                           QWheelEvent)
+from PySide6.QtWidgets import (QApplication, QDialog, QFrame,
+                               QGraphicsLineItem, QGraphicsPixmapItem,
+                               QGraphicsRectItem, QGraphicsScene,
+                               QGraphicsView, QHeaderView, QLabel, QLineEdit,
+                               QListView, QListWidget, QProxyStyle,
+                               QStyleOption, QTableView, QWidget)
 
-from .edit_copy_target_ui import Ui_CopyTargetDialog
-from .edit_merge_tracks_ui import Ui_MergeTracksTargetDialog
-from .edit_transcode_target_ui import Ui_TranscodeTargetDialog
-from .edit_transcode_text_target_ui import Ui_TranscodeTextTargetDialog
-from .targets import (CopyTarget, MergeTracksTarget, OrganizeTarget,
-                      TranscodePictureTarget, TranscodeTextTarget,
-                      TranscodeTrackTarget)
+from .targets import (CopyTarget, CropPictureTarget, MergeTracksTarget,
+                      OrganizeTarget, TranscodePictureTarget,
+                      TranscodeTextTarget, TranscodeTrackTarget)
 
 USED_COLOR = QBrush(QColor(200, 255, 200, 255))
 PRED_COLOR = QBrush(QColor(255, 200, 200, 255))
@@ -92,7 +96,9 @@ class TargetListModel(QAbstractListModel):
             prefix = '*' if target.temporary else ''
             if isinstance(target, CopyTarget):
                 return prefix + target.output_name + " (copy)"
-            elif isinstance(target, (TranscodeTextTarget, TranscodePictureTarget)):
+            elif isinstance(target, CropPictureTarget):
+                return prefix + target.output_name + " (crop)"
+            elif isinstance(target, (TranscodeTextTarget, TranscodePictureTarget, TranscodeTrackTarget)):
                 return prefix + target.output_name + " (recode)"
             elif isinstance(target, MergeTracksTarget):
                 return prefix + target.output_name + " (convert)"
@@ -181,10 +187,11 @@ class KeywordPanel(QWidget):
         self._keywords = []
         self._labels = []
         # TODO: reuse QLabel widgets
-        # TODO: add scroll bar
 
     def extendKeywords(self, keywords: List[str]):
         for kw in keywords:
+            if not kw.strip(): # skip empty string
+                continue
             self._keywords.append(kw)
 
             label = QLabel(kw, self)
@@ -208,15 +215,17 @@ class KeywordPanel(QWidget):
         leftMargin = rightMargin = 5
         x = leftMargin
         y = rowPadding
+        nrows = 1
         for label in self._labels:
             if x + label.width() + rightMargin > self.width():
                 x = leftMargin
                 y += label.height() + rowPadding
+                nrows += 1
             label.move(x, y)
             x += label.width() + colPadding
 
         if len(self._labels) > 0:
-            self.setMinimumHeight(self._labels[0].height() + rowPadding * 2)
+            self.setMinimumHeight(self._labels[0].height() * nrows + rowPadding * 2)
 
     def clear(self):
         for label in self._labels:
@@ -396,6 +405,202 @@ class TrackTableModel(QAbstractTableModel):
         else:
             return super().dropMimeData(data, action, row, column, parent)
 
+class CropImageView(QGraphicsView):
+    xOffsetChanged = Signal(float)
+    yOffsetChanged = Signal(float)
+    scaleChanged = Signal(float)
+    rotationChanged = Signal(float)
+    speedChanged = Signal(int)
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(scene=QGraphicsScene(), parent=parent)
+        self._box_pad_scale = 0.95 # ratio of margin between displayed crop box and widget frame
+        self._box_actual_dim = 800 # px, actual output size of cropped image
+        self._click_type = None
+        self._click_origin = None
+        self._offset_origin = None
+        self._speed_origin = None
+        self._line_len = 20 # length of crop box center cross
+        self._modifier_state = None
+
+    def setup(self, image: Path, **initial_config: dict) -> None:
+        self._image = QImage(str(image))
+        self.resetConfig()
+        if initial_config:
+            for k, v in initial_config.items():
+                if v is not None:
+                    self._config[k] = v
+
+        self._image_item = QGraphicsPixmapItem(QPixmap.fromImage(self._image))
+        pen = QPen(QColor(200, 100, 0, 128))
+        pen.setWidth(0)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        self._crop_box_item = QGraphicsRectItem(
+            -self._box_actual_dim / 2, -self._box_actual_dim / 2,
+            self._box_actual_dim, self._box_actual_dim
+        )
+        self._crop_box_item.setPen(pen)
+        self._crop_box_hline = QGraphicsLineItem(-self._line_len / 2-1, 0, self._line_len / 2, 0)
+        self._crop_box_hline.setPen(pen)
+        self._crop_box_vline = QGraphicsLineItem(0, -self._line_len / 2-1, 0, self._line_len / 2)
+        self._crop_box_vline.setPen(pen)
+
+        self.scene().addItem(self._image_item)
+        self.scene().addItem(self._crop_box_item)
+        self.scene().addItem(self._crop_box_hline)
+        self.scene().addItem(self._crop_box_vline)
+
+    def resetConfig(self) -> None:
+        key_dim = min(self._image.width(), self._image.height())
+        default_s = self._box_actual_dim / key_dim
+        self._config = edict(
+            xoffset = -key_dim / 2,
+            yoffset = -key_dim / 2,
+            scale = default_s,
+            rotation = 0,
+            speed = 0 # power index
+        )
+        self.xOffsetChanged.emit(self._config.xoffset)
+        self.yOffsetChanged.emit(self._config.yoffset)
+        self.scaleChanged.emit(self._config.scale)
+        self.rotationChanged.emit(self._config.rotation)
+        self.speedChanged.emit(self._config.speed)
+
+    def updateConfig(self, **configs) -> None:
+        # this function won't trigger signals, for internal use
+        for k, v in configs.items():
+            if v is not None:
+                self._config[k] = v
+        self.refreshSceneLayout()
+
+    def refreshSceneLayout(self) -> None:
+        r = self.size().width() / self.size().height()
+        box_actual_dim = self._box_actual_dim / self._box_pad_scale
+
+        if r > 1:
+            viewport = QRect(
+                -r * box_actual_dim / 2,
+                -box_actual_dim / 2,
+                r * box_actual_dim, box_actual_dim
+            )
+        else:
+            viewport = QRect(
+                -box_actual_dim / 2,
+                -box_actual_dim / r / 2,
+                box_actual_dim, box_actual_dim / r
+            )
+        self.setSceneRect(viewport)
+        self.fitInView(viewport)
+
+        self._image_item.setPos(self._config.xoffset, self._config.yoffset)
+        self._image_item.setTransformOriginPoint(-self._config.xoffset, -self._config.yoffset)
+        self._image_item.setScale(self._config.scale)
+        self._image_item.setRotation(self._config.rotation)
+
+    def speedRatio(self):
+        return 1.2 ** self._config.speed
+
+    def applyOffset(self, xpixels, ypixels, origin=None):
+        scale = min(self.width(), self.height()) / (self._box_actual_dim / self._box_pad_scale) * self._config.scale
+        dx = xpixels / scale * self.speedRatio()
+        dy = ypixels / scale * self.speedRatio()
+        r = math.radians(self._config.rotation)
+        if origin is None:
+            self._config.xoffset +=  dx*math.cos(r) + dy*math.sin(r)
+            self._config.yoffset += -dx*math.sin(r) + dy*math.cos(r)
+        else:
+            self._config.xoffset = origin[0] + dx*math.cos(r) + dy*math.sin(r)
+            self._config.yoffset = origin[1] - dx*math.sin(r) + dy*math.cos(r)
+
+        self.xOffsetChanged.emit(self._config.xoffset)
+        self.yOffsetChanged.emit(self._config.yoffset)
+        self.refreshSceneLayout()
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        super().keyPressEvent(event)
+
+        if event.key() == Qt.Key_Alt:
+            self._modifier_state = "alt"
+        elif event.key() == Qt.Key_Shift:
+            self._modifier_state = "shift"
+        elif event.key() == Qt.Key_Control:
+            self._modifier_state = "ctrl"
+        elif event.key() == Qt.Key_R:
+            self.resetConfig()
+        elif event.key() == Qt.Key_Q:
+            self._speed_origin = self._config.speed
+            self._config.speed = max(self._config.speed - 2, -10)
+            self.speedChanged.emit(self._config.speed)
+        elif event.key() == Qt.Key_E:
+            self._speed_origin = self._config.speed
+            self._config.speed = min(self._config.speed + 2, 10)
+            self.speedChanged.emit(self._config.speed)
+
+    def keyReleaseEvent(self, event: QKeyEvent) -> None:
+        super().keyReleaseEvent(event)
+
+        if event.key() == Qt.Key_Alt and self._modifier_state == "alt":
+            self._modifier_state = None
+        elif event.key() == Qt.Key_Shift and self._modifier_state == "shift":
+            self._modifier_state = None
+        elif event.key() == Qt.Key_Control and self._modifier_state == "ctrl":
+            self._modifier_state = None
+        elif event.key() in [Qt.Key_Q, Qt.Key_E]:
+            self._config.speed = self._speed_origin
+            self.speedChanged.emit(self._config.speed)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        self.refreshSceneLayout()
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if self._click_type is None:
+            self._click_origin = (event.x(), event.y())
+            self._offset_origin = (self._config.xoffset, self._config.yoffset)
+            self._angle_start = self._config.rotation
+        self._click_type = event.button()
+        return super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self._click_type == Qt.LeftButton:
+            self.applyOffset(event.x() - self._click_origin[0], event.y() - self._click_origin[1], self._offset_origin)
+        elif self._click_type == Qt.RightButton:
+            astart = math.atan2(self._click_origin[1] - self.height() / 2, self._click_origin[0] - self.width() / 2)
+            aend = math.atan2(event.y() - self.height() / 2, event.x() - self.width() / 2)
+            self._config.rotation = (self._angle_start + math.degrees(aend - astart)  * self.speedRatio()) % 360
+            self.rotationChanged.emit(self._config.rotation)
+            self.refreshSceneLayout()
+        
+        return super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        self._click_type = None
+
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        if self._modifier_state is None:
+            delta = event.angleDelta().y()
+            delta = delta if delta < 100 else 10 # larger or smaller than 100 is usually mouse scroll
+            delta = delta if delta > -100 else -10
+            delta *= self.speedRatio()
+            self._config.scale = max(self._config.scale * 1.01 ** delta, 0.01)
+            self.scaleChanged.emit(self._config.scale)
+        elif self._modifier_state == "alt":
+            # by default delta value is at y direction. when pressing alt it will be x direction.
+            self.applyOffset(event.angleDelta().x(), 0)
+        elif self._modifier_state == "shift":
+            self.applyOffset(0, event.angleDelta().y())
+        elif self._modifier_state == "ctrl":
+            self._config.rotation += event.angleDelta().y() * self.speedRatio()
+            self.rotationChanged.emit(self._config.rotation)
+        self.refreshSceneLayout()
+
+from .edit_copy_target_ui import Ui_CopyTargetDialog
+from .edit_crop_picture_ui import Ui_CropPictureDialog
+# delay import to prevent cyclic reference
+from .edit_merge_tracks_ui import Ui_MergeTracksTargetDialog
+from .edit_transcode_target_ui import Ui_TranscodeTargetDialog
+from .edit_transcode_text_target_ui import Ui_TranscodeTextTargetDialog
+
+
 def editCopyTarget(self: CopyTarget, input_root: Path = None, output_root: Path = None):
     dialog = QDialog()
     dialog.setWindowIcon(_get_icon())
@@ -501,7 +706,7 @@ async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None
         tracks_new = [self._tracks[i] for i in table_model._track_order]
         self._tracks = tracks_new
 
-def editTranscodeTextTarget(self: TranscodeTextTarget, input_root: Path = None, output_root=None):
+def editTranscodeTextTarget(self: TranscodeTextTarget, input_root: Path = None, output_root: Path = None):
     assert isinstance(self._input[0], str), "Only support reading from file by now!"
 
     dialog = QDialog()
@@ -538,14 +743,79 @@ def editTranscodePictureTarget(self: TranscodePictureTarget, input_root: Path = 
             self._outstem = self._outstem[:-len(suffix)-1]
         self._codec = codec
 
+def editTranscodeTrackTarget(self: TranscodeTrackTarget, input_root: Path = None, output_root: Path = None):
+    dialog = QDialog()
+    dialog.setWindowIcon(_get_icon())
+    layout = Ui_TranscodeTargetDialog()
+    layout.setupUi(dialog)
+    layout.retranslateUi(dialog)
+    layout.txt_outname.setText(self._outstem)
+
+    codecs_names = [f".{v.type} ({c})" for c, v in global_config.audio_codecs.items()]
+    layout.cbox_suffix.addItems(codecs_names)
+    layout.cbox_suffix.setCurrentText(f".{global_config.audio_codecs[self._codec].type }({self._codec})")
+    if dialog.exec_():
+        suffix, codec = parse(".{} ({})", layout.cbox_suffix.currentText())
+        self._outstem = layout.txt_outname.text()
+        if self._outstem.endswith(suffix):
+            self._outstem = self._outstem[:-len(suffix)-1]
+        self._codec = codec
+
+def editCropPictureTarget(self: CropPictureTarget, input_root: Path = None, output_root: Path = None):
+    dialog = QDialog()
+    dialog.setWindowIcon(_get_icon())
+    layout = Ui_CropPictureDialog()
+    layout.setupUi(dialog)
+    layout.retranslateUi(dialog)
+    layout.txt_outname.setText(self._outstem)
+
+    # set up image widget
+    layout.image_box.setFocus()
+    layout.image_box.xOffsetChanged.connect(lambda xoffset: layout.sbox_centerx.setValue(xoffset))
+    layout.image_box.yOffsetChanged.connect(lambda yoffset: layout.sbox_centery.setValue(yoffset))
+    layout.image_box.scaleChanged.connect(lambda scale: layout.sbox_scale.setValue(scale))
+    layout.image_box.rotationChanged.connect(lambda rotation: layout.sbox_rotation.setValue(rotation))
+    layout.image_box.speedChanged.connect(lambda speed: layout.dial_speed.setValue(speed))
+    layout.image_box.setup(input_root / self._input[0],
+        xoffset = self._centerx, yoffset = self._centery,
+        rotation = self._rotation, scale = self._scale)
+
+    if self._centerx is not None: layout.sbox_centerx.setValue(self._centerx)
+    if self._centery is not None: layout.sbox_centery.setValue(self._centery)
+    if self._scale is not None: layout.sbox_scale.setValue(self._scale)
+    if self._rotation is not None: layout.sbox_rotation.setValue(self._rotation)
+    layout.sbox_centerx.valueChanged.connect(lambda value: layout.image_box.updateConfig(xoffset=value))
+    layout.sbox_centery.valueChanged.connect(lambda value: layout.image_box.updateConfig(yoffset=value))
+    layout.sbox_scale.valueChanged.connect(lambda value: layout.image_box.updateConfig(scale=value))
+    layout.sbox_rotation.valueChanged.connect(lambda value: layout.image_box.updateConfig(rotation=value))
+    layout.dial_speed.valueChanged.connect(lambda value: layout.image_box.updateConfig(speed=value))
+
+    codecs_names = [f".{v.type} ({c})" for c, v in global_config.image_codecs.items()]
+    layout.cbox_suffix.addItems(codecs_names)
+    layout.cbox_suffix.setCurrentText(f".{global_config.image_codecs[self._codec].type }({self._codec})")
+    if dialog.exec_():
+        suffix, codec = parse(".{} ({})", layout.cbox_suffix.currentText())
+        self._outstem = layout.txt_outname.text()
+        if self._outstem.endswith(suffix):
+            self._outstem = self._outstem[:-len(suffix)-1]
+        self._codec = codec
+        self._centerx = layout.image_box._config.xoffset
+        self._centery = layout.image_box._config.yoffset
+        self._scale = layout.image_box._config.scale
+        self._rotation = layout.image_box._config.rotation
+
 async def editTarget(target: OrganizeTarget, input_root: Path = None, output_root: Path = None):
     if isinstance(target, MergeTracksTarget):
         await editMergeTracksTarget(target, input_root, output_root)
+    elif isinstance(target, CropPictureTarget):
+        editCropPictureTarget(target, input_root, output_root)
     elif isinstance(target, CopyTarget):
         editCopyTarget(target, input_root, output_root)
     elif isinstance(target, TranscodePictureTarget):
         editTranscodePictureTarget(target, input_root, output_root)
     elif isinstance(target, TranscodeTextTarget):
         editTranscodeTextTarget(target, input_root, output_root)
+    elif isinstance(target, TranscodeTrackTarget):
+        editTranscodeTrackTarget(target, input_root, output_root)
     else:
         raise ValueError("Invalid target type for editing!")
