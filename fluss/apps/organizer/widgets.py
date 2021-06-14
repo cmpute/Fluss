@@ -186,7 +186,6 @@ class KeywordPanel(QWidget):
         self._keywords = []
         self._labels = []
         # TODO: reuse QLabel widgets
-        # TODO: add scroll bar
 
     def extendKeywords(self, keywords: List[str]):
         for kw in keywords:
@@ -582,9 +581,9 @@ class CropImageView(QGraphicsView):
             delta = delta if delta < 100 else 10 # larger or smaller than 100 is usually mouse scroll
             delta = delta if delta > -100 else -10
             delta *= self.speedRatio()
-            self._config.scale *= 1.01 ** delta
+            self._config.scale = max(self._config.scale * 1.01 ** delta, 0.01)
             self.scaleChanged.emit(self._config.scale)
-        elif self._modifier_state == "alt": # TODO: implement 2D translate support from touch pad events
+        elif self._modifier_state == "alt":
             # by default delta value is at y direction. when pressing alt it will be x direction.
             self.applyOffset(event.angleDelta().x(), 0)
         elif self._modifier_state == "shift":

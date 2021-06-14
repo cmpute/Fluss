@@ -350,6 +350,26 @@ class FolderMeta:
 
 class AlbumMeta: # corresponds to meta.yaml
     folders: Dict[str, FolderMeta]
+    title: str
+    artists: Set[str]
+    publisher: str
+    vendor: str
+    event: str
+    date: str
+    genre: str
+    associations: Dict[str, str]
 
     def __init__(self):
         self.folders = dict()
+        self.title = None
+        self.artists = None
+        self.publisher = None
+        self.vendor = None
+        self.event = None
+        self.date = None
+        self.genre = None
+        self.associations = dict()
+
+    @property
+    def full_artist(self) -> str:
+        return ', '.join(self.artists) if self.artists else None

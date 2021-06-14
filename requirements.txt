@@ -3,3 +3,4 @@ mutagen
 chardet
 networkx
 parse
+python-dateutil
