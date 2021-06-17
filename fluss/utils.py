@@ -8,6 +8,9 @@ from fluss.meta import DiscMeta
 from fluss.config import global_config
 from pathlib import Path
 from io import BytesIO
+import logging
+
+_logger = logging.getLogger("fluss")
 
 def _get_codec(filename: Union[str, Path], codec: str = None) -> codecs.AudioCodec:
     if codec:
@@ -81,8 +84,10 @@ async def merge_tracks(files_in: List[Union[str, Path]],
 
         # update offset
         if not dry_run:
+            _logger.info("Decoding %s", str(file))
             wave_in = await icodec.decode_async(file,
                 progress_callback=lambda p: progress_callback(p + idx * 0.5 / len(files_in)))
+            _logger.info("Decoding done")
             streams.append(wave_in)
         if cur_track.index00 is not None:
             if cur_track.index00 >= 0:
@@ -115,8 +120,11 @@ async def merge_tracks(files_in: List[Union[str, Path]],
         buf = BytesIO()
         codecs.merge_streams(streams, buf)
 
+        _logger.info("Encoding %s", str(file_out))
         await ocodec.encode_async(file_out, buf.getvalue(),
             progress_callback=lambda p: progress_callback(p + 0.5))
+        _logger.info("Encoding done")
+
         mutag = ocodec.mutagen(file_out)
         meta.to_mutagen(mutag)
         mutag.save()

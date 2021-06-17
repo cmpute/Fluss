@@ -253,7 +253,7 @@ class monkeysaudio(AudioCodec):
             tmp_file.write_bytes(wavein)
 
             args = [C.path.mac, str(tmp_file), _resolve_pathstr(fout)] + self.encode_args
-            stderr = subprocess.DEVNULL if progress_callback is None else subprocess.PIPE
+            stderr = None if progress_callback is None else subprocess.PIPE
             proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
 
             if progress_callback is not None:
@@ -281,7 +281,7 @@ class monkeysaudio(AudioCodec):
             tmp_file = Path(tmp, 'tmp.ape')
 
             args = [C.path.mac, _resolve_pathstr(fin), str(tmp_file), '-d']
-            stderr = subprocess.DEVNULL if progress_callback is None else subprocess.PIPE
+            stderr = None if progress_callback is None else subprocess.PIPE
             proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
 
             if progress_callback is not None:

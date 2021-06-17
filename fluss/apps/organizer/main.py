@@ -45,6 +45,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._placeholders = defaultdict(edict) # save placeholder text for folder-specific fields
         self._last_tab_index = None
         self._executing = False
+        self._task = None
         self._status_owner = None
 
         self.setupUi(self)
@@ -67,7 +68,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_del_folder.clicked.connect(self.removeOutputFolder)
         self.btn_reset.clicked.connect(lambda: self.txt_input_path.clear() or self.reset())
         self.btn_apply.clicked.connect(lambda: self.statusbar.showMessage("Starting execution..."))
-        self.btn_apply.clicked.connect(self.executeTargets)
+        self.btn_apply.clicked.connect(self.applyRequested)
         self.btn_apply.enterEvent = self.applyButtonEnter
         self.btn_apply.leaveEvent = self.applyButtonLeave
         self.txt_input_path.textChanged.connect(self.inputChanged)
@@ -84,9 +85,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.tab_folders.currentChanged.connect(self.updateSelectedFolder)
 
     def applyButtonEnter(self, event):
-        self._status_owner = self.btn_apply
-        outpath = Path(self.txt_output_path.text(), self.formattedOutputName)
-        self.statusbar.showMessage("Start conversion to " + str(outpath))
+        if self._status_owner is None:
+            self._status_owner = self.btn_apply
+            outpath = Path(self.txt_output_path.text(), self.formattedOutputName)
+            self.statusbar.showMessage("Start conversion to " + str(outpath))
 
     def applyButtonLeave(self, event):
         if self._status_owner == self.btn_apply:
@@ -273,8 +275,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         msgbox.setDefaultButton(QMessageBox.No)
 
         if msgbox.exec_() == QMessageBox.Yes:
-            if self._executing and self._thread is not None:
-                self._thread.terminate()
+            if self._task is not None:
+                self._task.cancel()
             self.close()
 
     def previewInput(self, item: QListWidgetItem):
@@ -327,7 +329,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         else:
                             self.txt_comment.setPlaceholderText(comment)
                     if target._meta.cuesheet.rems.get('DATE', ''):
-                        self.txt_date.setText(target._meta.cuesheet.rems['DATE'])
+                        self.txt_date.setPlaceholderText(target._meta.cuesheet.rems['DATE'])
                 if target._meta.partnumber:
                     partnumbers.append(target._meta.partnumber)
 
@@ -480,6 +482,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self._enable_cross_selection = False
 
     @asyncSlot()
+    async def applyRequested(self):
+        self._task = asyncio.ensure_future(self.executeTargets())
+        await self._task
+        self._task = None
+
     async def executeTargets(self):
         self._executing = True
 
@@ -499,6 +506,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         output_path.mkdir(exist_ok=True, parents=True)
         files_to_remove = []
         for i, target in enumerate(order):
+            self._status_owner = target
             self.statusbar.showMessage("(%d/%d) Executing: %s" % (i, len(order), str(target)))
             if isinstance(target, str):
                 continue
@@ -517,6 +525,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for f in files_to_remove:
             f.unlink()
         self.statusbar.showMessage("Organizing done successfully!", 2000)
+        self._status_owner = None
         self._executing = False
 
 def entry():
