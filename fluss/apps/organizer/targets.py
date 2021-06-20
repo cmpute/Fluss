@@ -86,6 +86,10 @@ class CopyTarget(OrganizeTarget):
     def output_name(self):
         return self._outname
 
+    @property
+    def initialized(self):
+        return True
+
     def __str__(self):
         return "Copying %s" % self.output_name
 
@@ -210,6 +214,10 @@ class MergeTracksTarget(OrganizeTarget):
                 unknown_files.append(fin)
 
         return audio_files, cue_file, cover_file, unknown_files
+
+    @property
+    def initialized(self):
+        return self._meta is not None
 
     @classmethod
     def validate(cls, input_files):
@@ -355,6 +363,10 @@ class CropPictureTarget(TranscodePictureTarget):
         self._centery = None
         self._scale = None
         self._rotation = None
+
+    @property
+    def initialized(self):
+        return self._scale is not None
 
 target_types = [
     CopyTarget,

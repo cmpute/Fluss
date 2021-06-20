@@ -1,13 +1,16 @@
 from collections import defaultdict
-from typing import BinaryIO, List, Set, Dict
 from io import BytesIO
-from PIL import Image
+from typing import BinaryIO, Dict, List, Set
+
 import mutagen
+from mutagen.apev2 import BINARY, TEXT, APEv2, APEv2File, APEValue
 from mutagen.flac import FLAC, Picture
-from mutagen.apev2 import APEv2, APEv2File, APEValue, BINARY, TEXT
 from mutagen.id3 import ID3, ID3FileType, PictureType
+from PIL import Image
+
 from fluss import cuesheet
 from fluss.cuesheet import Cuesheet, CuesheetTrack, _default_cuesheet_file
+
 
 def assert_field(v1, v2, field_name):
     assert not v1 or not v2 or v1 == v2, f"Inconsistent {field_name} between cuesheet and metadata!"
@@ -138,8 +141,6 @@ class DiscMeta:
             old_value = getattr(self, key, None)
             if (overwrite and new_value) or (not overwrite and not old_value):
                 setattr(self, key, new_value)
-                if key == "cover":
-                    print("Update cover:", len(new_value))
         self.artists.update(meta.artists)
         if self._cuesheet is None:
             self._cuesheet = meta._cuesheet
@@ -389,7 +390,7 @@ class FolderMeta:
     source: str
     ripper: str
     comment: str
-    database: dict
+    database: Dict[str, str]
 
     def __init__(self):
         self.catalog = None
@@ -400,6 +401,15 @@ class FolderMeta:
         self.ripper = None
         self.comment = None
         self.database = dict()
+
+    def to_dict(self) -> dict:
+        obj = dict()
+        for key in ['catalog', 'partnumber', 'edition', 'tool', 'source', 'ripper', 'comment']:
+            if getattr(self, key):
+                obj[key] = getattr(self, key)
+        if self.database:
+            obj['database'] = dict(self.database)
+        return obj
 
 class AlbumMeta: # corresponds to meta.yaml
     folders: Dict[str, FolderMeta]
@@ -426,3 +436,18 @@ class AlbumMeta: # corresponds to meta.yaml
     @property
     def full_artist(self) -> str:
         return ', '.join(self.artists) if self.artists else None
+
+    def to_dict(self) -> dict:
+        meta_dict = dict()
+        for key in ["title", "event", "date", "genre"]:
+            if getattr(self, key):
+                meta_dict[key] = getattr(self, key)
+        if self.artists:
+            meta_dict.artists = list(self.artists)
+        if self.associations:
+            meta_dict.associations = dict(self.associations)
+
+        obj = dict(meta=meta_dict)
+        for folder, fmeta in self.folders.items():
+            obj[folder] = fmeta.to_dict()
+        return obj

@@ -95,15 +95,16 @@ class TargetListModel(QAbstractListModel):
         if role == Qt.DisplayRole:
             prefix = '*' if target.temporary else ''
             if isinstance(target, CopyTarget):
-                return prefix + target.output_name + " (copy)"
+                disp = prefix + target.output_name + " (copy"
             elif isinstance(target, CropPictureTarget):
-                return prefix + target.output_name + " (crop)"
+                disp = prefix + target.output_name + " (crop"
             elif isinstance(target, (TranscodeTextTarget, TranscodePictureTarget, TranscodeTrackTarget)):
-                return prefix + target.output_name + " (recode)"
+                disp = prefix + target.output_name + " (recode"
             elif isinstance(target, MergeTracksTarget):
-                return prefix + target.output_name + " (convert)"
+                disp = prefix + target.output_name + " (convert"
             elif isinstance(target, OrganizeTarget):
-                return "(dummy)"
+                disp = "(dummy"
+            return disp + (")" if target.initialized else ", need init)")
         elif role == Qt.BackgroundRole:
             if self._states.hovered is not None:
                 if target in self._network.successors(self._states.hovered):
@@ -181,7 +182,7 @@ class TargetListModel(QAbstractListModel):
 class KeywordPanel(QWidget):
     _labels: List[QLabel]
 
-    def __init__(self, parent) -> None:
+    def __init__(self, parent=None) -> None:
         super().__init__(parent=parent)
 
         self._keywords = []

@@ -6,22 +6,19 @@ from collections import defaultdict
 from itertools import islice
 from os.path import commonprefix
 from pathlib import Path
-from queue import Queue
 from typing import Dict, List, Union
 
+import yaml
 from addict import Dict as edict
 from dateutil.parser import parse as date_parse
 from fluss.config import global_config
 from fluss.meta import AlbumMeta, FolderMeta
 from networkx import DiGraph, topological_sort
-from PySide6.QtCore import (QModelIndex, QObject, QPoint, QSize, Qt, QThread,
-                            QTimer, QUrl, Signal)
-from PySide6.QtGui import (QAction, QBrush, QColor, QContextMenuEvent,
-                           QDesktopServices, QIcon, QKeyEvent)
-from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog,
-                               QFrame, QLabel, QListView, QListWidget,
+from PySide6.QtCore import QModelIndex, QPoint, Qt, QUrl
+from PySide6.QtGui import QAction, QBrush, QDesktopServices, QKeyEvent
+from PySide6.QtWidgets import (QApplication, QFileDialog, QListView,
                                QListWidgetItem, QMainWindow, QMenu,
-                               QMessageBox, QProgressBar)
+                               QMessageBox)
 from qasync import QEventLoop, asyncSlot
 
 from . import main_rc
@@ -56,6 +53,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setWindowIcon(_get_icon())
         for format in global_config.organizer.output_format:
             self.cbox_output_type.addItem(format)
+        self.cbox_output_type.setCurrentIndex(0)
 
         # TODO: For debug
         self.txt_input_path.setText(r"D:\Temp\2010.12.30 [ORECD-02] 慣 -TRADITION- [C79]")
@@ -67,7 +65,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_add_folder.clicked.connect(lambda: self.addOutputFolder(self.txt_folder_name.currentText()))
         self.btn_del_folder.clicked.connect(self.removeOutputFolder)
         self.btn_reset.clicked.connect(lambda: self.txt_input_path.clear() or self.reset())
-        self.btn_apply.clicked.connect(lambda: self.statusbar.showMessage("Starting execution..."))
         self.btn_apply.clicked.connect(self.applyRequested)
         self.btn_apply.enterEvent = self.applyButtonEnter
         self.btn_apply.leaveEvent = self.applyButtonLeave
@@ -97,23 +94,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @property
     def formattedOutputName(self) -> str:
+        self.flushFolderMeta()
+
         if self.cbox_output_type.currentIndex() < 0:
             return ""
+
         if self._meta.date:
             date = date_parse(self._meta.date)
             yymmdd = date.strftime("%y%m%d")
         else:
             yymmdd = ""
+        partnumbers = [f.partnumber for f in self._meta.folders.values() if f.partnumber]
+
         name_args = dict(
-            title=self._meta.title or "",
-            artist=self._meta.full_artist or "",
+            title=self.txt_title.text() or self.txt_title.placeholderText(),
+            artist=self.txt_artists.text() or self.txt_artists.placeholderText(),
             yymmdd=yymmdd,
-            partnumber="",
-            event="",
-            collaboration="",
+            partnumber=self.combinePartnumber(partnumbers) if partnumbers else "",
+            event=self.txt_event.text(),
+            collaboration="", # TODO: add collaboration option?
         )
         name = global_config.organizer.output_format[self.cbox_output_type.currentText()].format(**name_args)
-        return name.replace("()", "").replace("[]", "").strip()
+        return name.replace("()", "").replace("[]", "").replace("[(", "(").replace(")]", ")").strip()
 
     def listInputViewLeave(self, event):
         self._shared_states.hovered = None
@@ -161,7 +163,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.txt_partnumber.setPlaceholderText(self._placeholders[self.currentOutputFolder].partnumber or "")
         self.txt_tool.setPlaceholderText(self._placeholders[self.currentOutputFolder].tool or "")
 
-    def flushFolderMeta(self, index: int):
+    def flushFolderMeta(self, index: int = None):
+        if index is None:
+            index = self.tab_folders.currentIndex()
+
         target_meta = self._meta.folders[self.tab_folders.tabText(index)]
         target_meta.catalog = self.txt_catalog.text()
         target_meta.partnumber = self.txt_partnumber.text()
@@ -312,6 +317,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.addTargetActions(menu)
         action = menu.exec_(self.list_input_files.mapToGlobal(pos))
 
+    def combinePartnumber(self, partnumbers: List[str]):
+        assert len(partnumbers) > 0
+        if len(partnumbers) == 1:
+            return partnumbers[0]
+
+        try:
+            prefix = commonprefix(partnumbers)
+            remain = [pn[len(prefix):] for pn in partnumbers]
+            remain_num = [int(i) for i in remain]
+            rmin, rmax = min(remain_num), max(remain_num)
+            if rmax - rmin + 1 == len(remain):
+                rlen = len(remain[0])
+                return prefix + str(rmin).zfill(rlen) + '~' + str(rmax).zfill(rlen)
+            else:
+                return prefix + '&'.join(remain)
+        except ValueError: # non trivial part numbers
+            return ','.join(partnumbers)
+
     def fillMetaFromFolder(self):
         partnumbers = []
         for target in self.currentOutputList._targets:
@@ -335,18 +358,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # combine part numbers
         if len(partnumbers) > 1:
-            try:
-                prefix = commonprefix(partnumbers)
-                remain = [pn[len(prefix):] for pn in partnumbers]
-                remain_num = [int(i) for i in remain]
-                rmin, rmax = min(remain_num), max(remain_num)
-                if rmax - rmin + 1 == len(remain):
-                    rlen = len(remain[0])
-                    pnstr = prefix + str(rmin).zfill(rlen) + '~' + str(rmax).zfill(rlen)
-                    self.txt_partnumber.setPlaceholderText(pnstr)
-                    self._placeholders[self.currentOutputFolder].partnumber = pnstr
-            except ValueError: # non trivial part numbers
-                pass
+            pnstr = self.combinePartnumber(partnumbers)
+            if ',' not in pnstr:
+                self.txt_partnumber.setPlaceholderText(pnstr)
+                self._placeholders[self.currentOutputFolder].partnumber = pnstr
         elif len(partnumbers) == 1:
             self.txt_partnumber.setPlaceholderText(partnumbers[0])
             self._placeholders[self.currentOutputFolder].partnumber = partnumbers[0]
@@ -439,7 +454,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.widget_keywords.extendKeywords(keywords)
 
         # default output path
-        self.txt_output_path.setText(str(path.parent / "organized" / path.name))
+        self.txt_output_path.setText(str(path.parent / "organized"))
 
     def reset(self):
         '''
@@ -483,7 +498,33 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @asyncSlot()
     async def applyRequested(self):
+        # check all targets has been initialized
+        for target in self._network.nodes:
+            if isinstance(target, OrganizeTarget) and not target.initialized:
+                msgbox = QMessageBox(self)
+                msgbox.setWindowTitle("Close")
+                msgbox.setIcon(QMessageBox.Critical)
+                msgbox.setText("There are uninitialized targets!")
+                msgbox.exec_()
+                return
+                
+        # flush folder meta
+        self.flushFolderMeta()
+        for folder, fmeta in self._meta.folders.items():
+            fmeta.tool = self._placeholders[folder].tool
+            fmeta.partnumber = self._placeholders[folder].partnumber
+
+        # flush 
+        self._meta.title = self.txt_title.text() or self.txt_title.placeholderText()
+        self._meta.publisher = self.txt_publisher.text() or self.txt_publisher.placeholderText()
+        self._meta.vendor = self.txt_vendor.text() or self.txt_vendor.placeholderText()
+        self._meta.event = self.txt_event.text() or self.txt_event.placeholderText()
+        self._meta.date = self.txt_date.text() or self.txt_date.placeholderText()
+        self._meta.genre = self.txt_genre.text() or self.txt_genre.placeholderText()
+
+        self.statusbar.showMessage("Starting execution...")
         self._task = asyncio.ensure_future(self.executeTargets())
+        self._status_owner = self._task
         await self._task
         self._task = None
 
@@ -502,7 +543,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 folder_map[target] = folder
 
         # execute targets
-        output_path = Path(self.txt_output_path.text())
+        output_path = Path(self.txt_output_path.text(), self.formattedOutputName)
         output_path.mkdir(exist_ok=True, parents=True)
         files_to_remove = []
         for i, target in enumerate(order):
@@ -522,6 +563,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if target.temporary:
                 files_to_remove.append(output_folder_root / target.output_name)
 
+        # create meta.yaml
+        meta_dict = self._meta.to_dict()
+        with Path(output_path, "meta.yaml").open("w") as fout:
+            yaml.dump(meta_dict, fout)
+
+        # clean up
         for f in files_to_remove:
             f.unlink()
         self.statusbar.showMessage("Organizing done successfully!")

@@ -6,3 +6,4 @@ parse
 pillow
 qasync
 python-dateutil
+pyyaml

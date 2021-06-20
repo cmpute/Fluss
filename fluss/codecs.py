@@ -42,6 +42,7 @@ def _get_temp_file(prefix='', ext=None):
         fname += ext
     return tmpfolder / fname
 
+
 class AudioCodec:
     suffix: str
     ''' output suffix of files with this codec
@@ -332,7 +333,6 @@ class monkeysaudio(AudioCodec):
     @classmethod
     def mutagen(cls, fin: str) -> mutagen.wavpack.WavPack:
         return mutagen.monkeysaudio.MonkeysAudio(fin)
-
 
 class trueaudio(AudioCodec):
     suffix = "tta"
