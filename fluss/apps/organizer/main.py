@@ -58,7 +58,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cbox_output_type.addItem(format)
 
         # TODO: For debug
-        self.txt_input_path.setText(r"C:\Users\cmput\Music\Sennzai - Tødestrieb")
+        self.txt_input_path.setText(r"D:\Temp\2010.12.30 [ORECD-02] 慣 -TRADITION- [C79]")
 
     def setupSignals(self):
         self.btn_input_browse.clicked.connect(self.browseInput)
@@ -524,7 +524,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         for f in files_to_remove:
             f.unlink()
-        self.statusbar.showMessage("Organizing done successfully!", 2000)
+        self.statusbar.showMessage("Organizing done successfully!")
         self._status_owner = None
         self._executing = False
 

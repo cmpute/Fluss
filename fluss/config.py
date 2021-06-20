@@ -31,3 +31,11 @@ global_config.organizer.output_codec.audio = "wavpack_hybrid"
 global_config.organizer.output_codec.text = "utf-8-sig"
 
 # TODO: load config from json/yaml/toml
+
+# setting up logging
+import logging
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                    datefmt='%m-%d %H:%M:%S',
+                    filename='fluss.log',
+                    filemode='w')

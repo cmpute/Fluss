@@ -1,10 +1,10 @@
 from collections import defaultdict
-from typing import List, Set, Dict
+from typing import BinaryIO, List, Set, Dict
 from io import BytesIO
 from PIL import Image
 import mutagen
 from mutagen.flac import FLAC, Picture
-from mutagen.apev2 import APEv2, APEv2File
+from mutagen.apev2 import APEv2, APEv2File, APEValue, BINARY, TEXT
 from mutagen.id3 import ID3, ID3FileType, PictureType
 from fluss import cuesheet
 from fluss.cuesheet import Cuesheet, CuesheetTrack, _default_cuesheet_file
@@ -138,6 +138,8 @@ class DiscMeta:
             old_value = getattr(self, key, None)
             if (overwrite and new_value) or (not overwrite and not old_value):
                 setattr(self, key, new_value)
+                if key == "cover":
+                    print("Update cover:", len(new_value))
         self.artists.update(meta.artists)
         if self._cuesheet is None:
             self._cuesheet = meta._cuesheet
@@ -209,14 +211,14 @@ class DiscMeta:
         '''
         Create metadata from media with APEv2 tags
         '''
-        pass
+        raise NotImplementedError("Parsing metadata from APE tags is not implemented!")
 
     @classmethod
     def from_id3(cls, id3_meta: ID3) -> "DiscMeta":
         '''
         Create metadata from media with ID3v2 tags
         '''
-        raise NotImplementedError("Parse metadata from ID3 tag is not implemented!")
+        raise NotImplementedError("Parsing metadata from ID3 tags is not implemented!")
 
     @classmethod
     def from_mutagen(cls, mutagen_file: mutagen.FileType) -> "DiscMeta":
@@ -319,15 +321,21 @@ class DiscMeta:
 
     def to_ape(self, ape_meta: APEv2File):
         def add_if_exist(obj, tag_key):
-            if obj:
-                ape_meta.tags[tag_key] = obj
+            if obj is None:
+                return
+            if isinstance(obj, str):
+                ape_meta.tags[tag_key] = APEValue(obj, TEXT)
+            elif isinstance(obj, bytes):
+                ape_meta.tags[tag_key] = APEValue(obj, BINARY)
+            else:
+                raise ValueError("Unknown tag value type")
 
         if ape_meta.tags is None:
             ape_meta.add_tags()
 
         add_if_exist(self.title, 'Album')
         add_if_exist(self.full_artist, 'Album artist')
-        add_if_exist(self.cover, 'Cover Art (Front)')
+        add_if_exist(b'fluss.jpg\x00' + self.cover, 'Cover Art (Front)')
         add_if_exist(self.genre, 'Genre')
         add_if_exist(self.date, 'Year')
         if self.cuesheet:

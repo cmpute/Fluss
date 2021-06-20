@@ -1,5 +1,8 @@
-from typing import Callable, List, Union
+from collections import defaultdict
+from ntpath import join
+from typing import Callable, List, Tuple, Union, Any
 import asyncio
+from PIL.Image import new
 
 import mutagen
 from fluss import codecs
@@ -8,9 +11,6 @@ from fluss.meta import DiscMeta
 from fluss.config import global_config
 from pathlib import Path
 from io import BytesIO
-import logging
-
-_logger = logging.getLogger("fluss")
 
 def _get_codec(filename: Union[str, Path], codec: str = None) -> codecs.AudioCodec:
     if codec:
@@ -22,6 +22,31 @@ def _get_codec(filename: Union[str, Path], codec: str = None) -> codecs.AudioCod
     else:
         codec_t = codecs.codec_from_filename(filename)
         return codec_t()
+
+class _ProgressCombiner:
+    '''
+    Combine progress for multiple parallel tasks
+    '''
+    def __init__(self, identifiers: list, progress_callback: Callable[[float], None] = None, range: Tuple[float, float] = [0,1]) -> None:
+        self._callback = progress_callback
+        self._range = range
+        self._min_progress = 0
+        self._progress = {i: 0 for i in identifiers}
+
+        if progress_callback is not None:
+            progress_callback(float(range[0]))
+
+    def call(self): 
+        min_progress = min(self._progress.values())
+        if self._min_progress != min_progress and self._callback is not None:
+            self._callback(min_progress * (self._range[1] - self._range[0]) + self._range[0])
+            self._min_progress = min_progress
+
+    def get_updater(self, identifier: Any):
+        def update(progress: float):
+            self._progress[identifier] = progress
+            self.call()
+        return update
 
 async def merge_tracks(files_in: List[Union[str, Path]],
                        file_out: Union[str, Path],
@@ -65,6 +90,7 @@ async def merge_tracks(files_in: List[Union[str, Path]],
     offset = 0
     last_length = None
     streams = []
+    progress_updater = _ProgressCombiner(range(len(files_in)), progress_callback=progress_callback, range=[0, 0.5])
     for idx, file in enumerate(files_in):
         codec_t = codecs.codec_from_filename(file)
         icodec = codec_t()
@@ -84,10 +110,8 @@ async def merge_tracks(files_in: List[Union[str, Path]],
 
         # update offset
         if not dry_run:
-            _logger.info("Decoding %s", str(file))
-            wave_in = await icodec.decode_async(file,
-                progress_callback=lambda p: progress_callback(p + idx * 0.5 / len(files_in)))
-            _logger.info("Decoding done")
+            wave_in = asyncio.ensure_future(icodec.decode_async(file,
+                progress_callback=progress_updater.get_updater(idx)))
             streams.append(wave_in)
         if cur_track.index00 is not None:
             if cur_track.index00 >= 0:
@@ -110,6 +134,12 @@ async def merge_tracks(files_in: List[Union[str, Path]],
         last_length = int(mutag.info.length * 75)
         offset += last_length
 
+    # wait for completion
+    tasks = [(i, s) for i, s in enumerate(streams) if isinstance(s, asyncio.Task)]
+    results = await asyncio.gather(*[s for _, s in tasks])
+    for (i, _), r in zip(tasks, results):
+        streams[i] = r
+
     # update and assign cuesheet
     cuesheet.update(meta.to_cuesheet())
     meta.cuesheet = cuesheet
@@ -120,10 +150,8 @@ async def merge_tracks(files_in: List[Union[str, Path]],
         buf = BytesIO()
         codecs.merge_streams(streams, buf)
 
-        _logger.info("Encoding %s", str(file_out))
         await ocodec.encode_async(file_out, buf.getvalue(),
-            progress_callback=lambda p: progress_callback(p + 0.5))
-        _logger.info("Encoding done")
+            progress_callback=lambda p: progress_callback(p / 2 + 0.5))
 
         mutag = ocodec.mutagen(file_out)
         meta.to_mutagen(mutag)

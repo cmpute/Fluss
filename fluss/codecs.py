@@ -1,12 +1,20 @@
+'''
+async decoding will use temp file to store results first due to performance issue of Python pipe and qasync (see https://github.com/CabbageDevelopment/qasync/issues/43)
+'''
+
 import asyncio
 import io
 import re
 import subprocess
-from sys import stderr, stdout
 import wave
-from tempfile import mkstemp, TemporaryDirectory
+import tempfile
+from tempfile import mkstemp, TemporaryDirectory, TemporaryFile
 from pathlib import Path
 from typing import Any, Callable, List, Type, Union, Coroutine
+import logging
+import random
+
+_logger = logging.getLogger("fluss")
 
 import mutagen
 import mutagen.apev2
@@ -25,6 +33,14 @@ def _resolve_pathstr(file: Union[str, Path]):
         return str(file.resolve())
     else:
         raise ValueError("Incorrect path type")
+
+def _get_temp_file(prefix='', ext=None):
+    tmpfolder = Path(tempfile.gettempdir(), "fluss")
+    tmpfolder.mkdir(exist_ok=True)
+    fname = prefix + hex(random.getrandbits(48))[2:]
+    if ext:
+        fname += ext
+    return tmpfolder / fname
 
 class AudioCodec:
     suffix: str
@@ -100,6 +116,8 @@ class flac(AudioCodec):
         proc.communicate(wavein)
 
     async def encode_async(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, None]:
+        _logger.info("Encoding as flac to %s", fout)
+
         if progress_callback is None:
             args = [C.path.flac, "-sfV", "-", "-o", _resolve_pathstr(fout)] + self.encode_args
             stderr = None
@@ -124,35 +142,42 @@ class flac(AudioCodec):
         else:
             await proc.wait()
 
+        _logger.info("Encoding %s done")
+
     def decode(self, fin: str) -> wave.Wave_read:
         proc = subprocess.Popen([C.path.flac, "-sdc", _resolve_pathstr(fin)], stdout=subprocess.PIPE)
         return wave.open(proc.stdout, "rb")
 
     async def decode_async(self, fin: str, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, wave.Wave_read]:
+        ftmp = _get_temp_file(prefix='decode_', ext='.wav')
+        _logger.info("Decoding %s as flac to %s", fin, str(ftmp))
+
         if progress_callback is None:
-            args = [C.path.flac, "-sdc", _resolve_pathstr(fin)]
+            args = [C.path.flac, "-sdc", _resolve_pathstr(fin), "-o", str(ftmp)]
             stderr = None
         else:
-            args = [C.path.flac, "-dc", _resolve_pathstr(fin)]
+            args = [C.path.flac, "-dc", _resolve_pathstr(fin), "-o", str(ftmp)]
             stderr = subprocess.PIPE
 
-        proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.PIPE, stderr=stderr)
+        proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
 
         if progress_callback is not None:
             ptask = self._report_encode_progress(proc.stderr,
-                                                 pattern=rb'1?[0-9]{0,2}(?=% complete)',
-                                                 convert=lambda s: int(s) / 100,
-                                                 callback=progress_callback,
-                                                 linesep=b'\b')
-
-        raw = await proc.stdout.read()
+                                                pattern=rb'1?[0-9]{0,2}(?=% complete)',
+                                                convert=lambda s: int(s) / 100,
+                                                callback=progress_callback,
+                                                linesep=b'\b')
 
         if progress_callback is not None:
             await asyncio.gather(ptask, proc.wait())
         else:
             await proc.wait()
 
-        return wave.open(io.BytesIO(raw), 'rb')
+        buf = ftmp.read_bytes()
+        ftmp.unlink()
+
+        _logger.info("Decoding %s done")
+        return wave.open(io.BytesIO(buf), 'rb')
 
     @classmethod
     def mutagen(cls, fin: str) -> mutagen.flac.FLAC:
@@ -200,14 +225,17 @@ class wavpack(AudioCodec):
         return wave.open(proc.stdout, "rb")
 
     async def decode_async(self, fin: str, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, wave.Wave_read]:
+        _logger.info("Decoding %s as wavpack", fin)
+        ftmp = _get_temp_file("decode_", ".wav")
+
         if progress_callback is None:
-            args = [C.path.wvunpack, '-yq', _resolve_pathstr(fin), "-"]
+            args = [C.path.wvunpack, '-yq', _resolve_pathstr(fin), str(ftmp)]
             stderr = None
         else:
-            args = [C.path.wvunpack, '-y', _resolve_pathstr(fin), "-"]
+            args = [C.path.wvunpack, '-y', _resolve_pathstr(fin), str(ftmp)]
             stderr = subprocess.PIPE
 
-        proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.PIPE, stderr=stderr)
+        proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
 
         if progress_callback is not None:
             ptask = self._report_encode_progress(proc.stderr,
@@ -216,14 +244,14 @@ class wavpack(AudioCodec):
                                                  callback=progress_callback,
                                                  linesep=b'...')
 
-        raw = await proc.stdout.read()
-
         if progress_callback is not None:
             await asyncio.gather(ptask, proc.wait())
         else:
             await proc.wait()
 
-        return wave.open(io.BytesIO(raw), 'rb')
+        buf = ftmp.read_bytes()
+        _logger.info("Decoding %s done", fin)
+        return wave.open(io.BytesIO(buf), 'rb')
 
     @classmethod
     def mutagen(cls, fin: str) -> mutagen.wavpack.WavPack:
@@ -269,34 +297,37 @@ class monkeysaudio(AudioCodec):
                 await proc.wait()
 
     def decode(self, fin: str) -> wave.Wave_read:
-        with TemporaryDirectory() as tmp:
-            tmp_file = Path(tmp, 'tmp.ape')
-            proc = subprocess.Popen([C.path.mac, _resolve_pathstr(fin), str(tmp_file), '-d'], stderr=subprocess.DEVNULL)
-            proc.wait()
-            buf = io.BytesIO(tmp_file.read_bytes())
+        ftmp = _get_temp_file("decode_", ".wav")
+        proc = subprocess.Popen([C.path.mac, _resolve_pathstr(fin), str(ftmp), '-d'], stderr=subprocess.DEVNULL)
+        proc.wait()
+        buf = io.BytesIO(ftmp.read_bytes())
+        ftmp.unlink()
         return wave.open(buf, "rb")
 
     async def decode_async(self, fin: str, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, wave.Wave_read]:
-        with TemporaryDirectory() as tmp:
-            tmp_file = Path(tmp, 'tmp.ape')
+        _logger.info("Decoding %s as ape", fin)
+        ftmp = _get_temp_file("decode_", ".wav")
 
-            args = [C.path.mac, _resolve_pathstr(fin), str(tmp_file), '-d']
-            stderr = None if progress_callback is None else subprocess.PIPE
-            proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
+        args = [C.path.mac, _resolve_pathstr(fin), str(ftmp), '-d']
+        stderr = None if progress_callback is None else subprocess.PIPE
+        proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
 
-            if progress_callback is not None:
-                ptask = self._report_encode_progress(proc.stderr,
-                                                     pattern=rb'1?[0-9]{0,2}\.[0-9](?=% \()',
-                                                     convert=lambda s: float(s) / 100,
-                                                     callback=progress_callback,
-                                                     linesep=b')')
+        if progress_callback is not None:
+            ptask = self._report_encode_progress(proc.stderr,
+                                                    pattern=rb'1?[0-9]{0,2}\.[0-9](?=% \()',
+                                                    convert=lambda s: float(s) / 100,
+                                                    callback=progress_callback,
+                                                    linesep=b')')
 
-            if progress_callback is not None:
-                await asyncio.gather(ptask, proc.wait())
-            else:
-                await proc.wait()
+        if progress_callback is not None:
+            await asyncio.gather(ptask, proc.wait())
+        else:
+            await proc.wait()
 
-            return wave.open(io.BytesIO(tmp_file.read_bytes()), 'rb')
+        buf = ftmp.read_bytes()
+        ftmp.unlink()
+        _logger.info("Decoding %s done")
+        return wave.open(io.BytesIO(buf), 'rb')
 
     @classmethod
     def mutagen(cls, fin: str) -> mutagen.wavpack.WavPack:
@@ -339,9 +370,12 @@ class trueaudio(AudioCodec):
         return wave.open(proc.stdout, "rb")
 
     async def decode_async(self, fin: str, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, wave.Wave_read]:
-        args = [C.path.tta, "-d", _resolve_pathstr(fin), '-']
+        _logger.info("Decoding %s as tta", fin)
+        ftmp = _get_temp_file("decode_", ".wav")
+
+        args = [C.path.tta, "-d", _resolve_pathstr(fin), str(ftmp)]
         stderr = subprocess.DEVNULL if progress_callback is None else subprocess.PIPE
-        proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.PIPE, stderr=stderr)
+        proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
 
         if progress_callback is not None:
             ptask = self._report_encode_progress(proc.stderr,
@@ -350,14 +384,15 @@ class trueaudio(AudioCodec):
                                                  callback=progress_callback,
                                                  linesep=b'\r')
 
-        raw = await proc.stdout.read()
-
         if progress_callback is not None:
             await asyncio.gather(ptask, proc.wait())
         else:
             await proc.wait()
 
-        return wave.open(io.BytesIO(raw), 'rb')
+        buf = ftmp.read_bytes()
+        ftmp.unlink()
+        _logger.info("Decoding %s done")
+        return wave.open(io.BytesIO(buf), 'rb')
 
     @classmethod
     def mutagen(cls, fin: str) -> id3.ID3FileType:
