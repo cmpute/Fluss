@@ -1,6 +1,7 @@
 
 import math
 import re
+import traceback
 import typing
 from pathlib import Path
 from typing import List, Union
@@ -265,12 +266,12 @@ class TrackTableModel(QAbstractTableModel):
         if len(track_source) > 1:
             self._columns = [self.SOURCE] + self._columns
         if meta.cuesheet:
-            self._columns.append([self.PREGAP])
+            self._columns.append(self.PREGAP)
             self._columns_editable.add(self.DURATION)
             self._columns_editable.add(self.PREGAP)
 
         # logging order change
-        self._track_order = list(range(len(track_length) if track_length else len(self._meta.tracks)))
+        self._track_order = list(range(max(len(track_length or []), len(self._meta.tracks))))
         self._track_length = track_length
         self._track_source = track_source
 
@@ -284,6 +285,9 @@ class TrackTableModel(QAbstractTableModel):
                     return ""
             else:
                 i = index.row()-1
+                if self._meta.tracks[i] is None:
+                    return "<None>"
+
                 if self._columns[index.column()] == self.TITLE:
                     return self._meta.tracks[i].title
                 elif self._columns[index.column()] == self.ARTISTS:
@@ -318,14 +322,13 @@ class TrackTableModel(QAbstractTableModel):
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         flag = super().flags(index)
-        flag_drop = Qt.ItemIsDropEnabled if not self._meta.cuesheet else 0
         if index.isValid():
             if self._columns[index.column()] in self._columns_editable:
                 flag = flag | Qt.ItemIsEditable
-            if index.row() > 0:
-                flag = flag | Qt.ItemIsDragEnabled | flag_drop
-        else:
-            flag = flag | Qt.ItemIsDropEnabled | flag_drop
+            if index.row() > 0 and not self._meta.cuesheet:
+                flag = flag | Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled
+        elif not self._meta.cuesheet:
+            flag = flag | Qt.ItemIsDropEnabled
         return flag
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int):
@@ -349,9 +352,9 @@ class TrackTableModel(QAbstractTableModel):
             if self._columns[col] == self.TITLE:
                 self._meta.tracks[i].title = value
             elif self._columns[col] == self.ARTISTS:
-                self._meta.tracks[i].artists = set(re.split(r',\s|;\s', value))
+                self._meta.tracks[i].artists = set(re.split(global_config.organizer.artist_splitter, value))
             elif self._columns[col] == self.PREGAP:
-                pass
+                pass # TODO: implement PREGAP and DURATION edit
 
         if role == Qt.EditRole:
             if index.row() == 0: # edit all roles
@@ -364,7 +367,6 @@ class TrackTableModel(QAbstractTableModel):
         return False
 
     def relocateRows(self, srcRows: List[int], targetRow: int):
-        print(srcRows, targetRow)
         srcRows = [i-1 for i in srcRows]
 
         src_indices = []
@@ -656,6 +658,7 @@ async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None
                 cs = await self._cue.apply_stream(input_root)
                 cs = Cuesheet.parse(cs.getvalue().decode('utf-8-sig'))
             self._meta.update(DiscMeta.from_cuesheet(cs))
+            self._meta.cuesheet = cs
 
         cue_from_file = False
         for i, track in enumerate(self._tracks):
@@ -666,6 +669,7 @@ async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None
                 if cue_from_file:
                     raise ValueError("Multiple built-in cuesheet found!")
                 self._meta.update(DiscMeta.from_cuesheet(cs))
+                self._meta.cuesheet = cs
                 cue_from_file = True
 
             # Extract other files
@@ -683,8 +687,7 @@ async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None
     layout.tbtn_parse_tag.setVisible(self._meta.cuesheet is None)
 
     # set up model
-    meta_copy = DiscMeta()
-    meta_copy.update(self._meta)
+    meta_copy = self._meta.copy()
     track_lengths = [tag_from_source(track).info.length for track in self._tracks]
     table_model = TrackTableModel(layout.table_tracks, meta_copy, self._tracks, track_lengths)
     layout.table_tracks.setModel(table_model)
@@ -694,20 +697,21 @@ async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None
     if dialog.exec_():
         self._meta = meta_copy
         self._meta.title = layout.txt_album_title.text()
-        self._meta.artists = set(re.split(r",\s+|;\s+", layout.txt_album_artists.text()))
+        self._meta.artists = set(re.split(global_config.organizer.artist_splitter, layout.txt_album_artists.text()))
         self._meta.partnumber = layout.txt_partnumber.text()
         self._outstem = layout.txt_outname.text()
 
         # update codec selection
         codec = codecs_list[layout.cbox_suffix.currentIndex()]
-        suffix = "." + codec_from_name[codec.type].suffix
+        suffix = "." + codec_from_name[global_config.audio_codecs[codec].type].suffix
         self._outstem = layout.txt_outname.text()
         if self._outstem.endswith(suffix):
             self._outstem = self._outstem[:-len(suffix)-1]
         self._codec = codec
 
         # update track order
-        tracks_new = [self._tracks[i] for i in table_model._track_order]
+        if not self._meta.cuesheet:
+            tracks_new = [self._tracks[i] for i in table_model._track_order]
         self._tracks = tracks_new
 
 def editTranscodeTrackTarget(self: TranscodeTrackTarget, input_root: Path = None, output_root: Path = None):
@@ -724,7 +728,7 @@ def editTranscodeTrackTarget(self: TranscodeTrackTarget, input_root: Path = None
     layout.cbox_suffix.setCurrentIndex(codecs_list.index(self._codec))
     if dialog.exec_():
         codec = codecs_list[layout.cbox_suffix.currentIndex()]
-        suffix = "." + codec_from_name[codec.type].suffix
+        suffix = "." + codec_from_name[global_config.audio_codecs[codec].type].suffix
         self._outstem = layout.txt_outname.text()
         if self._outstem.endswith(suffix):
             self._outstem = self._outstem[:-len(suffix)-1]
@@ -816,17 +820,20 @@ def editCropPictureTarget(self: CropPictureTarget, input_root: Path = None, outp
         self._rotation = layout.image_box._config.rotation
 
 async def editTarget(target: OrganizeTarget, input_root: Path = None, output_root: Path = None):
-    if isinstance(target, MergeTracksTarget):
-        await editMergeTracksTarget(target, input_root, output_root)
-    elif isinstance(target, CropPictureTarget):
-        editCropPictureTarget(target, input_root, output_root)
-    elif isinstance(target, CopyTarget):
-        editCopyTarget(target, input_root, output_root)
-    elif isinstance(target, TranscodePictureTarget):
-        editTranscodePictureTarget(target, input_root, output_root)
-    elif isinstance(target, TranscodeTextTarget):
-        editTranscodeTextTarget(target, input_root, output_root)
-    elif isinstance(target, TranscodeTrackTarget):
-        editTranscodeTrackTarget(target, input_root, output_root)
-    else:
-        raise ValueError("Invalid target type for editing!")
+    try:
+        if isinstance(target, MergeTracksTarget):
+            await editMergeTracksTarget(target, input_root, output_root)
+        elif isinstance(target, CropPictureTarget):
+            editCropPictureTarget(target, input_root, output_root)
+        elif isinstance(target, CopyTarget):
+            editCopyTarget(target, input_root, output_root)
+        elif isinstance(target, TranscodePictureTarget):
+            editTranscodePictureTarget(target, input_root, output_root)
+        elif isinstance(target, TranscodeTextTarget):
+            editTranscodeTextTarget(target, input_root, output_root)
+        elif isinstance(target, TranscodeTrackTarget):
+            editTranscodeTrackTarget(target, input_root, output_root)
+        else:
+            raise ValueError("Invalid target type for editing!")
+    except:
+        traceback.print_exc()

@@ -31,6 +31,10 @@ global_config.organizer.output_codec.image = "png"
 global_config.organizer.output_codec.audio = "wavpack_hybrid"
 global_config.organizer.output_codec.text = "utf-8-sig"
 
+# some other options
+global_config.organizer.artist_splitter = r",\s+|;\s+"  # regex expression for splitting artist
+global_config.organizer.keyword_splitter = r';| - |\[|\]|\(|\)'  # regex expression for splitting keyword
+
 # TODO: load config from json/yaml/toml
 
 # setting up logging

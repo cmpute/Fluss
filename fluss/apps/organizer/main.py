@@ -56,7 +56,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.cbox_output_type.setCurrentIndex(0)
 
         # TODO: For debug
-        self.txt_input_path.setText(r"D:\Temp\2010.12.30 [ORECD-02] 慣 -TRADITION- [C79]")
+        self.txt_input_path.setText(r"E:\#Music\MUSIC(整碟下载320K-Lossles)\同人专辑\[合集]K-waves LAB\★★(C85)(同人音楽)[k-waves LAB] Eorzean Minstrels' Story (flac+inCue+log)[EAC by 子檀]")
 
     def setupSignals(self):
         self.btn_input_browse.clicked.connect(self.browseInput)
@@ -247,7 +247,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def browseInput(self):
         dlg = QFileDialog()
         dlg.setFileMode(QFileDialog.Directory)
-            
+        if self.txt_input_path and Path(self.txt_input_path.text()).exists():
+            dlg.setDirectory(self.txt_input_path.text())
+
         if dlg.exec_():
             self.txt_input_path.setText(dlg.selectedFiles()[0])
 
@@ -444,7 +446,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # generate keywords
         keywords = set()
-        keypattern = re.compile(r';| - |\[|\]|\(|\)') # TODO: make the splitter configurable
+        keypattern = re.compile(global_config.organizer.keyword_splitter)
         keywords.update(k.strip() for k in keypattern.split(path.name) if k.strip())
         if len(os.listdir(path)) == 0:
             subf = next(path.iterdir())
@@ -464,6 +466,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.list_input_files.clear()
         self.widget_keywords.clear()
         self.tab_folders.clear()
+
+        self.txt_title.setText(None)
+        self.txt_artists.setText(None)
+        self.txt_publisher.setText(None)
+        self.txt_vendor.setText(None)
+        self.txt_partnumber.setText(None)
+        self.txt_event.setText(None)
+        self.txt_date.setText(None)
+        self.txt_genre.setText(None)
 
         # clear placeholder text
         self.txt_title.setPlaceholderText(None)
@@ -516,6 +527,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # flush 
         self._meta.title = self.txt_title.text() or self.txt_title.placeholderText()
+        artist_text = self.txt_artists.text() or self.txt_artists.placeholderText()
+        self._meta.artists = re.split(global_config.organizer.artist_splitter, artist_text)
         self._meta.publisher = self.txt_publisher.text() or self.txt_publisher.placeholderText()
         self._meta.vendor = self.txt_vendor.text() or self.txt_vendor.placeholderText()
         self._meta.event = self.txt_event.text() or self.txt_event.placeholderText()

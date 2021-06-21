@@ -1,11 +1,13 @@
-from collections import defaultdict, namedtuple, OrderedDict
+from ast import parse
+from collections import OrderedDict, defaultdict, namedtuple
+from copy import deepcopy
+from os import linesep
 from pathlib import Path
 from typing import Dict, Union
-from os import linesep
 
 import chardet
 from chardet.enums import LanguageFilter
-from mutagen import flac, Tags
+from mutagen import FileType, Tags, flac
 
 
 def _parse_index_point(timestr: str) -> int:
@@ -75,6 +77,9 @@ class Cuesheet:
         self.performer = None
         self.catalog = None
         self.files = OrderedDict()
+
+    def copy(self):
+        return deepcopy(self)
 
     def update(self, cuesheet: "Cuesheet", overwrite: bool = True, merge_file: bool = None):
         '''
@@ -171,21 +176,25 @@ class Cuesheet:
         return cue
 
     @classmethod
-    def from_mutagen(cls, tag: Union[flac.FLAC, Tags]) -> "Cuesheet":
+    def from_mutagen(cls, tag: Union[flac.FLAC, Tags, FileType]) -> "Cuesheet":
         if isinstance(tag, flac.FLAC):
             if tag.cuesheet:
                 return cls.from_flac(tag.cuesheet)
             else:
+                tags_upper = {k.upper(): v[0] for k, v in tag.tags.items()}
+        elif isinstance(tag, Tags):
+            tags_upper = {k.upper(): v for k, v in tag.items()}
+        elif isinstance(tag, FileType):
+            if not tag.tags:
                 return None
-        elif isinstance(tag, (Tags)):
-            if 'CUESHEET' in tag:
-                return cls.parse(tag['CUESHEET'])
-            elif 'Cuesheet' in tag:
-                return cls.parse(tag['Cuesheet'])
-            else:
-                return None
+            tags_upper = {k.upper(): v for k, v in tag.tags.items()}
         else:
-            raise ValueError("Unrecognized mutagen input")
+            raise ValueError("Unrecognized mutagen input: " + str(type(tag)))
+            
+        if 'CUESHEET' in tags_upper:
+            return cls.parse(tags_upper['CUESHEET'])
+        else:
+            return None
 
     @classmethod
     def from_file(cls, path: Union[str, Path], encoding=None) -> "Cuesheet":
@@ -218,7 +227,7 @@ class Cuesheet:
                     elif int(idx) == 1:
                         cur_tracks[cur_idx].index01 = offset
                     else:
-                        raise SyntaxError("Track index %02d is not supported!" % idx)
+                        print("WARNING: Track index %02d is not supported, will be ignored!" % idx)
                 elif field == "PREGAP":
                     cur_tracks[cur_idx].pregap = _parse_index_point(value)
                 elif field == "POSTGAP":
