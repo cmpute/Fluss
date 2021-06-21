@@ -43,7 +43,7 @@
         <bool>true</bool>
        </property>
        <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;normal drag -&amp;gt; shift&lt;/p&gt;&lt;p&gt;right click drag -&amp;gt; rotate&lt;/p&gt;&lt;p&gt;normal scroll -&amp;gt; scaling&lt;/p&gt;&lt;p&gt;alt scroll -&amp;gt; x shift&lt;/p&gt;&lt;p&gt;shift scroll -&amp;gt; y shift&lt;/p&gt;&lt;p&gt;ctrl scroll -&amp;gt; rotate&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;normal drag -&amp;gt; shift&lt;br/&gt;right click drag -&amp;gt; rotate&lt;br/&gt;normal scroll -&amp;gt; scaling&lt;br/&gt;alt scroll -&amp;gt; x shift&lt;br/&gt;shift scroll -&amp;gt; y shift&lt;br/&gt;ctrl scroll -&amp;gt; rotate&lt;/body&gt;z -&amp;gt; temporarily decrease sensitivity &lt;br/&gt; c -&amp;gt; temporarily increase sensitivity&lt;/html&gt;</string>
        </property>
        <property name="verticalScrollBarPolicy">
         <enum>Qt::ScrollBarAlwaysOff</enum>
@@ -117,14 +117,17 @@
          </item>
          <item>
           <widget class="QDoubleSpinBox" name="sbox_scale">
+           <property name="decimals">
+            <number>3</number>
+           </property>
            <property name="minimum">
-            <double>0.010000000000000</double>
+            <double>0.001000000000000</double>
            </property>
            <property name="maximum">
             <double>10.000000000000000</double>
            </property>
            <property name="singleStep">
-            <double>0.200000000000000</double>
+            <double>0.010000000000000</double>
            </property>
            <property name="stepType">
             <enum>QAbstractSpinBox::DefaultStepType</enum>
@@ -150,6 +153,9 @@
            <property name="maximum">
             <double>10000.000000000000000</double>
            </property>
+           <property name="singleStep">
+            <double>0.100000000000000</double>
+           </property>
            <property name="stepType">
             <enum>QAbstractSpinBox::DefaultStepType</enum>
            </property>
@@ -162,7 +168,7 @@
          <item>
           <widget class="QLabel" name="label_6">
            <property name="text">
-            <string>Speed</string>
+            <string>Sensitivity</string>
            </property>
           </widget>
          </item>

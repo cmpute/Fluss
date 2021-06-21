@@ -6,12 +6,11 @@ from pathlib import Path
 from typing import List, Union
 
 from addict import Dict as edict
+from fluss import codecs
 from fluss.codecs import codec_from_filename, codec_from_name
 from fluss.config import global_config
 from fluss.meta import Cuesheet, DiscMeta, TrackMeta
 from networkx import DiGraph
-from networkx.algorithms.distance_measures import center
-from parse import parse
 from PySide6.QtCore import (QAbstractListModel, QAbstractTableModel,
                             QItemSelection, QItemSelectionModel, QMimeData,
                             QModelIndex, QRect, Qt, Signal)
@@ -27,7 +26,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFrame,
 
 from .targets import (CopyTarget, CropPictureTarget, MergeTracksTarget,
                       OrganizeTarget, TranscodePictureTarget,
-                      TranscodeTextTarget, TranscodeTrackTarget)
+                      TranscodeTextTarget, TranscodeTrackTarget, _image_suffix_from_format)
 
 USED_COLOR = QBrush(QColor(200, 255, 200, 255))
 PRED_COLOR = QBrush(QColor(255, 200, 200, 255))
@@ -417,15 +416,17 @@ class CropImageView(QGraphicsView):
         super().__init__(scene=QGraphicsScene(), parent=parent)
         self._box_pad_scale = 0.95 # ratio of margin between displayed crop box and widget frame
         self._box_actual_dim = 800 # px, actual output size of cropped image
+        self._line_len = 20 # length of crop box center cross
+
         self._click_type = None
         self._click_origin = None
         self._offset_origin = None
         self._speed_origin = None
-        self._line_len = 20 # length of crop box center cross
         self._modifier_state = None
 
-    def setup(self, image: Path, **initial_config: dict) -> None:
+    def setup(self, image: Path, box_actual_dim=800, **initial_config: dict) -> None:
         self._image = QImage(str(image))
+        self._box_actual_dim = box_actual_dim
         self.resetConfig()
         if initial_config:
             for k, v in initial_config.items():
@@ -441,9 +442,9 @@ class CropImageView(QGraphicsView):
             self._box_actual_dim, self._box_actual_dim
         )
         self._crop_box_item.setPen(pen)
-        self._crop_box_hline = QGraphicsLineItem(-self._line_len / 2-1, 0, self._line_len / 2, 0)
+        self._crop_box_hline = QGraphicsLineItem(-self._line_len / 2, 0, self._line_len / 2 + 1, 0)
         self._crop_box_hline.setPen(pen)
-        self._crop_box_vline = QGraphicsLineItem(0, -self._line_len / 2-1, 0, self._line_len / 2)
+        self._crop_box_vline = QGraphicsLineItem(0, -self._line_len / 2, 0, self._line_len / 2 + 1)
         self._crop_box_vline.setPen(pen)
 
         self.scene().addItem(self._image_item)
@@ -455,8 +456,8 @@ class CropImageView(QGraphicsView):
         key_dim = min(self._image.width(), self._image.height())
         default_s = self._box_actual_dim / key_dim
         self._config = edict(
-            xoffset = -key_dim / 2,
-            yoffset = -key_dim / 2,
+            xoffset = key_dim / 2,
+            yoffset = key_dim / 2,
             scale = default_s,
             rotation = 0,
             speed = 0 # power index
@@ -493,8 +494,8 @@ class CropImageView(QGraphicsView):
         self.setSceneRect(viewport)
         self.fitInView(viewport)
 
-        self._image_item.setPos(self._config.xoffset, self._config.yoffset)
-        self._image_item.setTransformOriginPoint(-self._config.xoffset, -self._config.yoffset)
+        self._image_item.setPos(-self._config.xoffset, -self._config.yoffset)
+        self._image_item.setTransformOriginPoint(self._config.xoffset, self._config.yoffset)
         self._image_item.setScale(self._config.scale)
         self._image_item.setRotation(self._config.rotation)
 
@@ -507,11 +508,11 @@ class CropImageView(QGraphicsView):
         dy = ypixels / scale * self.speedRatio()
         r = math.radians(self._config.rotation)
         if origin is None:
-            self._config.xoffset +=  dx*math.cos(r) + dy*math.sin(r)
-            self._config.yoffset += -dx*math.sin(r) + dy*math.cos(r)
+            self._config.xoffset += -dx*math.cos(r) - dy*math.sin(r)
+            self._config.yoffset +=  dx*math.sin(r) - dy*math.cos(r)
         else:
-            self._config.xoffset = origin[0] + dx*math.cos(r) + dy*math.sin(r)
-            self._config.yoffset = origin[1] - dx*math.sin(r) + dy*math.cos(r)
+            self._config.xoffset = origin[0] - dx*math.cos(r) - dy*math.sin(r)
+            self._config.yoffset = origin[1] + dx*math.sin(r) - dy*math.cos(r)
 
         self.xOffsetChanged.emit(self._config.xoffset)
         self.yOffsetChanged.emit(self._config.yoffset)
@@ -519,6 +520,7 @@ class CropImageView(QGraphicsView):
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         super().keyPressEvent(event)
+        # TODO: support movement with keyboard
 
         if event.key() == Qt.Key_Alt:
             self._modifier_state = "alt"
@@ -528,13 +530,13 @@ class CropImageView(QGraphicsView):
             self._modifier_state = "ctrl"
         elif event.key() == Qt.Key_R:
             self.resetConfig()
-        elif event.key() == Qt.Key_Q:
+        elif event.key() == Qt.Key_Z:
             self._speed_origin = self._config.speed
-            self._config.speed = max(self._config.speed - 2, -10)
+            self._config.speed = max(self._config.speed - 4, -10)
             self.speedChanged.emit(self._config.speed)
-        elif event.key() == Qt.Key_E:
+        elif event.key() == Qt.Key_X:
             self._speed_origin = self._config.speed
-            self._config.speed = min(self._config.speed + 2, 10)
+            self._config.speed = min(self._config.speed + 4, 10)
             self.speedChanged.emit(self._config.speed)
 
     def keyReleaseEvent(self, event: QKeyEvent) -> None:
@@ -546,7 +548,7 @@ class CropImageView(QGraphicsView):
             self._modifier_state = None
         elif event.key() == Qt.Key_Control and self._modifier_state == "ctrl":
             self._modifier_state = None
-        elif event.key() in [Qt.Key_Q, Qt.Key_E]:
+        elif event.key() in [Qt.Key_Z, Qt.Key_X]:
             self._config.speed = self._speed_origin
             self.speedChanged.emit(self._config.speed)
 
@@ -582,7 +584,7 @@ class CropImageView(QGraphicsView):
             delta = delta if delta < 100 else 10 # larger or smaller than 100 is usually mouse scroll
             delta = delta if delta > -100 else -10
             delta *= self.speedRatio()
-            self._config.scale = max(self._config.scale * 1.01 ** delta, 0.01)
+            self._config.scale = max(self._config.scale * 1.005 ** delta, 0.001)
             self.scaleChanged.emit(self._config.scale)
         elif self._modifier_state == "alt":
             # by default delta value is at y direction. when pressing alt it will be x direction.
@@ -629,16 +631,16 @@ async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None
     layout.txt_outname.setPlaceholderText(self._default_output_name())
     layout.txt_outname.setText(self._outstem)
     codecs_names = [f".{codec_from_name[v.type].suffix} ({c})" for c, v in global_config.audio_codecs.items()]
+    codecs_list = list(global_config.audio_codecs.keys())
     layout.cbox_suffix.addItems(codecs_names)
-    current_codec_type = global_config.audio_codecs[self._codec].type
-    layout.cbox_suffix.setCurrentText(f".{codec_from_name[current_codec_type].suffix} ({self._codec})")
+    layout.cbox_suffix.setCurrentIndex(codecs_list.index(self._codec))
 
     # util for extract tag
     def tag_from_source(source):
         if isinstance(source, str):
             cls_codec = codec_from_filename(input_root / source)
             return cls_codec.mutagen(input_root / source)
-        else: # isinstance(self._cue, (CopyTarget, TranscodeTrackTarget)):
+        else:
             assert isinstance(source._input, str), "Cannot parse tags from complex target"
             cls_codec = codec_from_filename(input_root / source._input)
             return cls_codec.mutagen(input_root / source)
@@ -697,7 +699,8 @@ async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None
         self._outstem = layout.txt_outname.text()
 
         # update codec selection
-        suffix, codec = parse(".{} ({})", layout.cbox_suffix.currentText())
+        codec = codecs_list[layout.cbox_suffix.currentIndex()]
+        suffix = "." + codec_from_name[codec.type].suffix
         self._outstem = layout.txt_outname.text()
         if self._outstem.endswith(suffix):
             self._outstem = self._outstem[:-len(suffix)-1]
@@ -706,6 +709,26 @@ async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None
         # update track order
         tracks_new = [self._tracks[i] for i in table_model._track_order]
         self._tracks = tracks_new
+
+def editTranscodeTrackTarget(self: TranscodeTrackTarget, input_root: Path = None, output_root: Path = None):
+    dialog = QDialog()
+    dialog.setWindowIcon(_get_icon())
+    layout = Ui_TranscodeTargetDialog()
+    layout.setupUi(dialog)
+    layout.retranslateUi(dialog)
+    layout.txt_outname.setText(self._outstem)
+
+    codecs_names = [f".{codec_from_name[v.type].suffix} ({c})" for c, v in global_config.audio_codecs.items()]
+    codecs_list = list(global_config.audio_codecs.keys())
+    layout.cbox_suffix.addItems(codecs_names)
+    layout.cbox_suffix.setCurrentIndex(codecs_list.index(self._codec))
+    if dialog.exec_():
+        codec = codecs_list[layout.cbox_suffix.currentIndex()]
+        suffix = "." + codec_from_name[codec.type].suffix
+        self._outstem = layout.txt_outname.text()
+        if self._outstem.endswith(suffix):
+            self._outstem = self._outstem[:-len(suffix)-1]
+        self._codec = codec
 
 def editTranscodeTextTarget(self: TranscodeTextTarget, input_root: Path = None, output_root: Path = None):
     assert isinstance(self._input[0], str), "Only support reading from file by now!"
@@ -734,29 +757,13 @@ def editTranscodePictureTarget(self: TranscodePictureTarget, input_root: Path = 
     layout.retranslateUi(dialog)
     layout.txt_outname.setText(self._outstem)
 
-    codecs_names = [f".{v.type} ({c})" for c, v in global_config.image_codecs.items()]
+    codecs_names = [f".{_image_suffix_from_format[v.type]} ({c})" for c, v in global_config.image_codecs.items()]
+    codecs_list = list(global_config.image_codecs.keys())
     layout.cbox_suffix.addItems(codecs_names)
-    layout.cbox_suffix.setCurrentText(f".{global_config.image_codecs[self._codec].type }({self._codec})")
+    layout.cbox_suffix.setCurrentIndex(codecs_list.index(self._codec))
     if dialog.exec_():
-        suffix, codec = parse(".{} ({})", layout.cbox_suffix.currentText())
-        self._outstem = layout.txt_outname.text()
-        if self._outstem.endswith(suffix):
-            self._outstem = self._outstem[:-len(suffix)-1]
-        self._codec = codec
-
-def editTranscodeTrackTarget(self: TranscodeTrackTarget, input_root: Path = None, output_root: Path = None):
-    dialog = QDialog()
-    dialog.setWindowIcon(_get_icon())
-    layout = Ui_TranscodeTargetDialog()
-    layout.setupUi(dialog)
-    layout.retranslateUi(dialog)
-    layout.txt_outname.setText(self._outstem)
-
-    codecs_names = [f".{v.type} ({c})" for c, v in global_config.audio_codecs.items()]
-    layout.cbox_suffix.addItems(codecs_names)
-    layout.cbox_suffix.setCurrentText(f".{global_config.audio_codecs[self._codec].type }({self._codec})")
-    if dialog.exec_():
-        suffix, codec = parse(".{} ({})", layout.cbox_suffix.currentText())
+        codec = codecs_list[layout.cbox_suffix.currentIndex()]
+        suffix = "." + _image_suffix_from_format[global_config.image_codecs[codec].type]
         self._outstem = layout.txt_outname.text()
         if self._outstem.endswith(suffix):
             self._outstem = self._outstem[:-len(suffix)-1]
@@ -778,6 +785,7 @@ def editCropPictureTarget(self: CropPictureTarget, input_root: Path = None, outp
     layout.image_box.rotationChanged.connect(lambda rotation: layout.sbox_rotation.setValue(rotation))
     layout.image_box.speedChanged.connect(lambda speed: layout.dial_speed.setValue(speed))
     layout.image_box.setup(input_root / self._input[0],
+        box_actual_dim=self._output_size,
         xoffset = self._centerx, yoffset = self._centery,
         rotation = self._rotation, scale = self._scale)
 
@@ -791,11 +799,13 @@ def editCropPictureTarget(self: CropPictureTarget, input_root: Path = None, outp
     layout.sbox_rotation.valueChanged.connect(lambda value: layout.image_box.updateConfig(rotation=value))
     layout.dial_speed.valueChanged.connect(lambda value: layout.image_box.updateConfig(speed=value))
 
-    codecs_names = [f".{v.type} ({c})" for c, v in global_config.image_codecs.items()]
+    codecs_names = [f".{_image_suffix_from_format[v.type]} ({c})" for c, v in global_config.image_codecs.items()]
+    codecs_list = list(global_config.image_codecs.keys())
     layout.cbox_suffix.addItems(codecs_names)
-    layout.cbox_suffix.setCurrentText(f".{global_config.image_codecs[self._codec].type }({self._codec})")
+    layout.cbox_suffix.setCurrentIndex(codecs_list.index(self._codec))
     if dialog.exec_():
-        suffix, codec = parse(".{} ({})", layout.cbox_suffix.currentText())
+        codec = codecs_list[layout.cbox_suffix.currentIndex()]
+        suffix = "." + _image_suffix_from_format[global_config.image_codecs[codec].type]
         self._outstem = layout.txt_outname.text()
         if self._outstem.endswith(suffix):
             self._outstem = self._outstem[:-len(suffix)-1]

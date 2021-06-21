@@ -1,8 +1,11 @@
+from math import exp
 from pathlib import Path, PurePath
 from typing import Callable, List, Union
 from io import BytesIO
-from queue import Queue
 from shutil import copy2 as copy
+from PIL import Image
+import traceback
+from fluss import codecs
 
 from fluss.config import global_config
 from fluss.codecs import codec_from_name
@@ -10,7 +13,11 @@ from fluss.meta import DiscMeta
 from fluss.utils import merge_tracks, convert_track
 
 # readable suffixes supported by pillow
-PILLOW_SUFFIXES = ['png', 'jpg', 'bmp', 'tiff']
+PILLOW_SUFFIXES = ['png', 'jpg', 'jpeg', 'bmp', 'tiff']
+_image_suffix_from_format = {
+    "jpeg": "jpg",
+    "png": "png",
+}
 
 class OrganizeTarget:
     description = "Target"
@@ -33,6 +40,10 @@ class OrganizeTarget:
         return False
 
     @property
+    def initialized(self):
+        return True
+
+    @property
     def output_name(self) -> str:
         ''' output file name'''
         raise NotImplementedError("Abstract property!")
@@ -49,7 +60,10 @@ class OrganizeTarget:
         output_root is used when this target is not marked as temporary
         Should return the path to result file
         '''
-        data = await self.apply_stream(input_root)
+        try:
+            data = await self.apply_stream(input_root)
+        except Exception as e:
+            traceback.print_exc()
         Path(output_root, self.output_name).write_bytes(data.getvalue())
 
 
@@ -85,10 +99,6 @@ class CopyTarget(OrganizeTarget):
     @property
     def output_name(self):
         return self._outname
-
-    @property
-    def initialized(self):
-        return True
 
     def __str__(self):
         return "Copying %s" % self.output_name
@@ -126,7 +136,7 @@ class TranscodeTrackTarget(OrganizeTarget):
     def validate(cls, input_files):
         if len(input_files) != 1:
             return False
-        suffix = _split_name(input_files[0])[1]
+        suffix = _split_name(input_files[0])[1].lower()
         if suffix not in global_config.audio_codecs:
             return False
         return True
@@ -195,7 +205,7 @@ class MergeTracksTarget(OrganizeTarget):
         unknown_files = []
 
         for fin in input_files:
-            suffix = _split_name(fin)[1]
+            suffix = _split_name(fin)[1].lower()
             if not suffix:
                 unknown_files.append(fin)
             elif suffix in set(c.suffix for c in codec_from_name.values()):
@@ -267,8 +277,8 @@ class MergeTracksTarget(OrganizeTarget):
             )
 
     async def apply_stream(self, input_root):
-        # TODO: apply and then read
-        pass
+        # could apply and then read
+        raise NotImplementedError()
 
 class TranscodeTextTarget(OrganizeTarget):
     ''' Support text encoding fixing '''
@@ -295,7 +305,7 @@ class TranscodeTextTarget(OrganizeTarget):
     def validate(cls, input_files):
         if len(input_files) != 1:
             return False
-        suffix = _split_name(input_files[0])[1]
+        suffix = _split_name(input_files[0])[1].lower()
         if suffix not in cls.valid_file_types:
             return False
         return True
@@ -335,13 +345,14 @@ class TranscodePictureTarget(OrganizeTarget):
 
     @property
     def output_name(self):
-        return self._outstem + "." + global_config.image_codecs[self._codec].type
+        suffix = _image_suffix_from_format[global_config.image_codecs[self._codec].type]
+        return self._outstem + "." + suffix
 
     @classmethod
     def validate(cls, input_files):
         if len(input_files) != 1:
             return False
-        suffix = _split_name(input_files[0])[1]
+        suffix = _split_name(input_files[0])[1].lower()
         if suffix not in PILLOW_SUFFIXES:
             return False
         return True
@@ -352,21 +363,54 @@ class TranscodePictureTarget(OrganizeTarget):
     def __repr__(self):
         return "<TranscodePictureTarget output=%s>" % self.output_name
 
+    async def apply_stream(self, input_root):
+        im = Image.open(Path(input_root, self._input[0]))
+
+        buf = BytesIO()
+        codec = dict(global_config.image_codecs[self._codec])
+        format = codec.pop('type')
+        im.save(buf, format=format, **codec)
+        buf.seek(0)
+        return buf
+
 class CropPictureTarget(TranscodePictureTarget):
     ''' Support cover cropping '''
     description = "Crop Image"
 
-    def __init__(self, input_files, codec=global_config.organizer.output_codec.image):
+    def __init__(self, input_files, codec="jpg"):
         super().__init__(input_files, codec)
         self._outstem = "cover" # default name is cover
         self._centerx = None
         self._centery = None
         self._scale = None
-        self._rotation = None
+        self._rotation = None # degrees, clockwise
+        self._output_size = 800 # in pixel
 
     @property
     def initialized(self):
         return self._scale is not None
+
+    async def apply_stream(self, input_root):
+        im = Image.open(Path(input_root, self._input[0]))
+        im = im.rotate(-self._rotation, center=(self._centerx, self._centery), fillcolor=(255,255,255), resample=Image.BICUBIC)
+        scaled_size = self._output_size / self._scale
+        im = im.transform((int(scaled_size), int(scaled_size)), Image.EXTENT, [
+            self._centerx - scaled_size/2, self._centery - scaled_size/2,
+            self._centerx + scaled_size/2, self._centery + scaled_size/2], fillcolor=(255,255,255), resample=Image.BICUBIC)
+        im = im.resize((self._output_size, self._output_size), resample=Image.BICUBIC)
+
+        buf = BytesIO()
+        codec = dict(global_config.image_codecs[self._codec])
+        format = codec.pop('type')
+        im.save(buf, format=format, **codec)
+        buf.seek(0)
+        return buf
+
+    def __str__(self):
+        return "Croping picture to %s" % self.output_name
+
+    def __repr__(self):
+        return "<CropPictureTarget output=%s>" % self.output_name
 
 target_types = [
     CopyTarget,

@@ -17,7 +17,8 @@ global_config.audio_codecs.wavpack_hybrid.encode = ["-m", "-b192"]
 global_config.audio_codecs.flac.type = "flac"
 global_config.audio_codecs.flac.encode = []
 global_config.image_codecs.png.type = "png"
-global_config.image_codecs.jpg.type = "jpg"
+global_config.image_codecs.jpg.type = "jpeg"
+global_config.image_codecs.jpg.quality = 80
 
 # define possible output formats
 global_config.organizer.output_format.indie = "[{artist}][{partnumber}][{yymmdd}({event})][{collaboration}] {title}"
