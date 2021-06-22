@@ -5,19 +5,25 @@ from io import BytesIO
 from shutil import copy2 as copy
 from PIL import Image
 import traceback
+
+from PySide6.QtWidgets import QMessageBox
 from fluss import codecs
 
 from fluss.config import global_config
-from fluss.codecs import codec_from_name
+from fluss.codecs import codec_from_filename, codec_from_name
 from fluss.meta import DiscMeta
 from fluss.utils import merge_tracks, convert_track
+from fluss.accurip import verify_accurip, parse_accurip
 
 # readable suffixes supported by pillow
 PILLOW_SUFFIXES = ['png', 'jpg', 'jpeg', 'bmp', 'tiff']
 _image_suffix_from_format = {
     "jpeg": "jpg",
     "png": "png",
+    "bmp": "bmp",
+    "tiff": "tiff"
 }
+AUDIO_SUFFIXES = set(c.suffix for c in codec_from_name.values())
 
 class OrganizeTarget:
     description = "Target"
@@ -119,7 +125,6 @@ class TranscodeTrackTarget(OrganizeTarget):
     def __init__(self, input_files, codec=global_config.organizer.output_codec.audio):
         super().__init__(input_files)
 
-        self._outstem = "" # empty means using default name
         if codec in global_config.audio_codecs:
             self._codec = codec
         else:
@@ -137,7 +142,7 @@ class TranscodeTrackTarget(OrganizeTarget):
         if len(input_files) != 1:
             return False
         suffix = _split_name(input_files[0])[1].lower()
-        if suffix not in global_config.audio_codecs:
+        if suffix not in AUDIO_SUFFIXES:
             return False
         return True
 
@@ -208,7 +213,7 @@ class MergeTracksTarget(OrganizeTarget):
             suffix = _split_name(fin)[1].lower()
             if not suffix:
                 unknown_files.append(fin)
-            elif suffix in set(c.suffix for c in codec_from_name.values()):
+            elif suffix in AUDIO_SUFFIXES:
                 audio_files.append(fin)
             elif suffix == 'cue':
                 if cue_file is None:
@@ -412,6 +417,54 @@ class CropPictureTarget(TranscodePictureTarget):
     def __repr__(self):
         return "<CropPictureTarget output=%s>" % self.output_name
 
+class VerifyAccurateRipTarget(OrganizeTarget):
+    ''' Support cover cropping '''
+    description = "Verify with AccurateRip"
+
+    def __init__(self, input_files: List[Union[str, OrganizeTarget]]) -> None:
+        super().__init__(input_files)
+        assert len(self._input) == 1, "CopyTarget only accept one input!"
+
+        if isinstance(self._input[0], str):
+            self._outstem = PurePath(self._input[0]).stem
+        elif isinstance(self._input[0], OrganizeTarget):
+            self._outstem = self._input[0].output_name.rsplit('.', 1)[0]
+        else:
+            raise ValueError("Incorrect input type!")
+
+    @classmethod
+    def validate(cls, input_files):
+        if len(input_files) != 1:
+            return False
+        suffix = _split_name(input_files[0])[1].lower()
+        if suffix not in AUDIO_SUFFIXES:
+            return False
+        return True
+
+    @property
+    def output_name(self):
+        return self._outstem + ".accurip"
+
+    def __str__(self):
+        return "Verity with AccurateRip, log to %s" % self.output_name
+
+    def __repr__(self):
+        return "<VerifyAccurateRipTarget output=%s>" % self.output_name
+
+    async def apply_stream(self, input_root):
+        cdfile = Path(input_root, self._input[0])
+        results = await verify_accurip(cdfile)
+
+        parsed = parse_accurip(results)
+        if parsed.fail:
+            msgbox = QMessageBox()
+            msgbox.setWindowTitle("Verify failed")
+            msgbox.setIcon(QMessageBox.Critical)
+            msgbox.setText("AccurateRip verification failed! Please check the output file " + self.output_name)
+            msgbox.exec_()
+
+        return BytesIO(results)
+
 target_types = [
     CopyTarget,
     CropPictureTarget,
@@ -419,4 +472,5 @@ target_types = [
     TranscodeTrackTarget,
     TranscodeTextTarget,
     TranscodePictureTarget,
+    VerifyAccurateRipTarget
 ]

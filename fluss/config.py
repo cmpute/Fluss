@@ -8,10 +8,11 @@ global_config.path.wvunpack = r"D:\Github\fluss\codecs\wvunpack.exe"
 global_config.path.flac = r"D:\Github\fluss\codecs\flac.exe"
 global_config.path.mac = r"D:\Github\fluss\codecs\mac.exe"
 global_config.path.tta = r"D:\Github\fluss\codecs\tta_sse4.exe"
+global_config.path.arcue = r"C:\Program Files (x86)\CUETools\CUETools_2.1.6\ArCueDotNet.exe"
 
 # encoder preset configs
 global_config.audio_codecs.wavpack.type = "wavpack"
-global_config.audio_codecs.wavpack.encode = ["-m"]
+global_config.audio_codecs.wavpack.encode = ["-m"] # TODO: enable high compression as default
 global_config.audio_codecs.wavpack_hybrid.type = "wavpack"
 global_config.audio_codecs.wavpack_hybrid.encode = ["-m", "-b192"]
 global_config.audio_codecs.flac.type = "flac"

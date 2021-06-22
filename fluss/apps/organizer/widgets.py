@@ -21,13 +21,12 @@ from PySide6.QtGui import (QBrush, QColor, QDropEvent, QImage, QKeyEvent,
 from PySide6.QtWidgets import (QApplication, QDialog, QFrame,
                                QGraphicsLineItem, QGraphicsPixmapItem,
                                QGraphicsRectItem, QGraphicsScene,
-                               QGraphicsView, QHeaderView, QLabel, QLineEdit,
-                               QListView, QListWidget, QProxyStyle,
+                               QGraphicsView, QLabel, QLineEdit, QProxyStyle,
                                QStyleOption, QTableView, QWidget)
 
 from .targets import (CopyTarget, CropPictureTarget, MergeTracksTarget,
                       OrganizeTarget, TranscodePictureTarget,
-                      TranscodeTextTarget, TranscodeTrackTarget, _image_suffix_from_format)
+                      TranscodeTextTarget, TranscodeTrackTarget, VerifyAccurateRipTarget, _image_suffix_from_format)
 
 USED_COLOR = QBrush(QColor(200, 255, 200, 255))
 PRED_COLOR = QBrush(QColor(255, 200, 200, 255))
@@ -94,15 +93,19 @@ class TargetListModel(QAbstractListModel):
         target = self._targets[index.row()]
         if role == Qt.DisplayRole:
             prefix = '*' if target.temporary else ''
-            if isinstance(target, CopyTarget):
-                disp = prefix + target.output_name + " (copy"
-            elif isinstance(target, CropPictureTarget):
-                disp = prefix + target.output_name + " (crop"
-            elif isinstance(target, (TranscodeTextTarget, TranscodePictureTarget, TranscodeTrackTarget)):
-                disp = prefix + target.output_name + " (recode"
-            elif isinstance(target, MergeTracksTarget):
-                disp = prefix + target.output_name + " (convert"
-            elif isinstance(target, OrganizeTarget):
+            suffix_dict = {
+                CopyTarget: " (copy",
+                CropPictureTarget: " (crop",
+                TranscodeTextTarget: " (recode",
+                TranscodePictureTarget: " (recode",
+                TranscodeTrackTarget: " (recode",
+                MergeTracksTarget: " (convert",
+                VerifyAccurateRipTarget: " (verify"
+            }
+
+            if type(target) in suffix_dict:
+                disp = prefix + target.output_name + suffix_dict[type(target)]
+            else:
                 disp = "(dummy"
             return disp + (")" if target.initialized else ", need init)")
         elif role == Qt.BackgroundRole:
@@ -712,7 +715,7 @@ async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None
         # update track order
         if not self._meta.cuesheet:
             tracks_new = [self._tracks[i] for i in table_model._track_order]
-        self._tracks = tracks_new
+            self._tracks = tracks_new
 
 def editTranscodeTrackTarget(self: TranscodeTrackTarget, input_root: Path = None, output_root: Path = None):
     dialog = QDialog()
@@ -833,6 +836,8 @@ async def editTarget(target: OrganizeTarget, input_root: Path = None, output_roo
             editTranscodeTextTarget(target, input_root, output_root)
         elif isinstance(target, TranscodeTrackTarget):
             editTranscodeTrackTarget(target, input_root, output_root)
+        elif isinstance(target, VerifyAccurateRipTarget):
+            pass # nothing to edit
         else:
             raise ValueError("Invalid target type for editing!")
     except:
