@@ -17,14 +17,18 @@ import random
 _logger = logging.getLogger("fluss")
 
 import mutagen
-import mutagen.apev2
 import mutagen.flac
+import mutagen.wave
 import mutagen.wavpack
 import mutagen.monkeysaudio
 import mutagen.trueaudio
-from mutagen import id3
+
+from mutagen import id3, apev2
 
 from fluss.config import global_config as C
+
+APETagFiles = (apev2.APEv2File,)
+ID3TagFiles = (id3.ID3FileType, mutagen.wave.WAVE)
 
 def _resolve_pathstr(file: Union[str, Path]):
     if isinstance(file, str):
@@ -104,6 +108,33 @@ class AudioCodec:
             return f"{self.__class__.__name__} ({' '.join(self.encode_args)})"
         else:
             return f"{self.__class__.__name__} (default)"
+
+class wav(AudioCodec):
+    suffix = "wav"
+
+    def __init__(self, encode_args=None):
+        super().__init__(encode_args)
+
+    def encode(self, fout: str, wavein: bytes) -> None:
+        Path(fout).write_bytes(wavein)
+
+    async def encode_async(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None]) -> Coroutine[Any, Any, None]:
+        self.encode(fout, bytes)
+        if progress_callback:
+            progress_callback(1.0)
+
+    def decode(self, fin: str) -> wave.Wave_read:
+        return wave.open(Path(fin).open("rb"), "rb")
+
+    async def decode_async(self, fin: str, progress_callback: Callable[[float], None]) -> Coroutine[Any, Any, wave.Wave_read]:
+        result = self.decode(fin)
+        if progress_callback:
+            progress_callback(1.0)
+        return result
+
+    @classmethod
+    def mutagen(cls, fin: str) -> mutagen.FileType:
+        return mutagen.wave.WAVE(fin)
 
 class flac(AudioCodec):
     suffix = "flac"
@@ -403,7 +434,8 @@ codec_from_name = {
     'wavpack': wavpack,
     'flac': flac,
     'monkeysaudio': monkeysaudio,
-    'trueaudio': trueaudio
+    'trueaudio': trueaudio,
+    'wave': wav
 }
 
 def codec_from_filename(filename: Union[Path, str]) -> Type[AudioCodec]:

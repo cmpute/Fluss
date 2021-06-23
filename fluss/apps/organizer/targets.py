@@ -54,7 +54,7 @@ class OrganizeTarget:
         ''' output file name'''
         raise NotImplementedError("Abstract property!")
 
-    async def apply_stream(self, input_root: Path = None) -> BytesIO:
+    async def apply_stream(self, input_root: Path = None, output_root: Path = None) -> BytesIO:
         ''' execute target to BytesIO
         Should return the generated binary data
         '''
@@ -67,7 +67,7 @@ class OrganizeTarget:
         Should return the path to result file
         '''
         try:
-            data = await self.apply_stream(input_root)
+            data = await self.apply_stream(input_root, output_root)
         except Exception as e:
             traceback.print_exc()
         Path(output_root, self.output_name).write_bytes(data.getvalue())
@@ -115,7 +115,7 @@ class CopyTarget(OrganizeTarget):
     async def apply(self, input_root, output_root):
         copy(Path(input_root, self._input[0]), Path(output_root, self._outname))
 
-    async def apply_stream(self, input_root):
+    async def apply_stream(self, input_root, output_root):
         return BytesIO(Path(input_root, self._input[0]).read_bytes())
 
 class TranscodeTrackTarget(OrganizeTarget):
@@ -281,7 +281,7 @@ class MergeTracksTarget(OrganizeTarget):
                 progress_callback=progress_callback
             )
 
-    async def apply_stream(self, input_root):
+    async def apply_stream(self, input_root, output_root):
         # could apply and then read
         raise NotImplementedError()
 
@@ -319,7 +319,7 @@ class TranscodeTextTarget(OrganizeTarget):
     def output_name(self):
         return self._outname
 
-    async def apply_stream(self, input_root):
+    async def apply_stream(self, input_root, output_root):
         content = Path(input_root, self._input[0]).read_text(encoding=self._encoding, errors="replace")
         return BytesIO(content.encode('utf-8-sig'))
 
@@ -368,7 +368,7 @@ class TranscodePictureTarget(OrganizeTarget):
     def __repr__(self):
         return "<TranscodePictureTarget output=%s>" % self.output_name
 
-    async def apply_stream(self, input_root):
+    async def apply_stream(self, input_root, output_root):
         im = Image.open(Path(input_root, self._input[0]))
 
         buf = BytesIO()
@@ -395,7 +395,7 @@ class CropPictureTarget(TranscodePictureTarget):
     def initialized(self):
         return self._scale is not None
 
-    async def apply_stream(self, input_root):
+    async def apply_stream(self, input_root, output_root):
         im = Image.open(Path(input_root, self._input[0]))
         im = im.rotate(-self._rotation, center=(self._centerx, self._centery), fillcolor=(255,255,255), resample=Image.BICUBIC)
         scaled_size = self._output_size / self._scale
@@ -451,8 +451,11 @@ class VerifyAccurateRipTarget(OrganizeTarget):
     def __repr__(self):
         return "<VerifyAccurateRipTarget output=%s>" % self.output_name
 
-    async def apply_stream(self, input_root):
-        cdfile = Path(input_root, self._input[0])
+    async def apply_stream(self, input_root, output_root):
+        if isinstance(self._input[0], OrganizeTarget):
+            cdfile = Path(output_root, self._input[0].output_name)
+        else:
+            cdfile = Path(input_root, self._input[0])
         results = await verify_accurip(cdfile)
 
         parsed = parse_accurip(results)

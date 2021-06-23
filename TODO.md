@@ -1,2 +1,5 @@
 - [ ] support DSD stream load and save
-- [ ] support rip check by Accurip (CUETools)
+- [ ] test HiRes support with http://www.2l.no/hires/
+- [ ] Add "open directory with organizer" to right click menu
+- [ ] Support automatic disc number generation
+- [ ] Support graph parallel execution

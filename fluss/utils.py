@@ -172,8 +172,10 @@ async def convert_track(file_in: Union[str, Path],
     icodec = _get_codec(file_in)
     ocodec = _get_codec(file_out, codec_out)
 
-    if not dry_run:
+    if meta is None:
         meta = DiscMeta.from_mutagen(icodec.mutagen(file_in))
+
+    if not dry_run:
         wave_in = await icodec.decode_async(file_in,
             progress_callback=lambda p: progress_callback(p / 2))
 

@@ -1,19 +1,22 @@
 # AccurateRip support is based on CUETools
 
-from os import read, stat
-from typing import Union
-from pathlib import Path
-import subprocess
 import asyncio
+import subprocess
+from pathlib import Path
+from typing import Union
+
 import parse
 from addict import Dict as edict
+
 from .config import global_config
-from fluss import config
+
 
 async def verify_accurip(input_file: Union[str, Path]) -> str:
     args = [global_config.path.arcue, "-v", str(input_file)]
     process = await asyncio.create_subprocess_exec(*args, stdout=subprocess.PIPE)
-    await process.wait()
+    rt = await process.wait()
+    if rt != 0:
+        raise RuntimeError("ARCue returned non-zero!")
     return await process.stdout.read()
 
 def parse_accurip(accurip_log: Union[str, bytes]) -> dict:

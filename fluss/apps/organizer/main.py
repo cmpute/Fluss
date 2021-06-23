@@ -544,49 +544,54 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     async def executeTargets(self):
         self._executing = True
 
-        # sort targets
-        order = topological_sort(self._network)
-        order = [t for t in order if isinstance(t, OrganizeTarget)]
+        try:
+            # sort targets
+            order = topological_sort(self._network)
+            order = [t for t in order if isinstance(t, OrganizeTarget)]
 
-        # get output folder
-        folder_map = {}
-        for i in range(self.tab_folders.count()):
-            folder = self.tab_folders.tabText(i)
-            for target in self.tab_folders.widget(i).model():
-                folder_map[target] = folder
+            # get output folder
+            folder_map = {}
+            for i in range(self.tab_folders.count()):
+                folder = self.tab_folders.tabText(i)
+                for target in self.tab_folders.widget(i).model():
+                    folder_map[target] = folder
 
-        # execute targets
-        output_path = Path(self.txt_output_path.text(), self.formattedOutputName)
-        output_path.mkdir(exist_ok=True, parents=True)
-        files_to_remove = []
-        for i, target in enumerate(order):
-            self._status_owner = target
-            self.statusbar.showMessage("(%d/%d) Executing: %s" % (i, len(order), str(target)))
-            if isinstance(target, str):
-                continue
+            # execute targets
+            output_path = Path(self.txt_output_path.text(), self.formattedOutputName)
+            output_path.mkdir(exist_ok=True, parents=True)
+            files_to_remove = []
+            for i, target in enumerate(order):
+                self._status_owner = target
+                self.statusbar.showMessage("(%d/%d) Executing: %s" % (i, len(order), str(target)))
+                if isinstance(target, str):
+                    continue
 
-            output_folder_root = output_path / folder_map[target]
-            output_folder_root.mkdir(exist_ok=True)
-            if isinstance(target, MergeTracksTarget):
-                await target.apply(self._input_folder, output_folder_root,
-                    lambda q: self.statusbar.showMessage("(%d/%d) Executing: %s (%d%%)" % (i, len(order), str(target), int(q*100))))
-            else:
-                await target.apply(self._input_folder, output_folder_root)
+                output_folder_root = output_path / folder_map[target]
+                output_folder_root.mkdir(exist_ok=True)
+                if isinstance(target, MergeTracksTarget):
+                    await target.apply(self._input_folder, output_folder_root,
+                        lambda q: self.statusbar.showMessage("(%d/%d) Executing: %s (%d%%)" % (i, len(order), str(target), int(q*100))))
+                else:
+                    await target.apply(self._input_folder, output_folder_root)
 
-            if target.temporary:
-                files_to_remove.append(output_folder_root / target.output_name)
+                if target.temporary:
+                    files_to_remove.append(output_folder_root / target.output_name)
 
-        # create meta.yaml
-        meta_dict = self._meta.to_dict()
-        with Path(output_path, "meta.yaml").open("w") as fout:
-            yaml.dump(meta_dict, fout)
+            # create meta.yaml
+            meta_dict = self._meta.to_dict()
+            with Path(output_path, "meta.yaml").open("w") as fout:
+                yaml.dump(meta_dict, fout)
 
-        # clean up
-        for f in files_to_remove:
-            f.unlink()
-        self.statusbar.showMessage("Organizing done successfully!")
-        self._status_owner = None
-        self._executing = False
+            # clean up
+            for f in files_to_remove:
+                f.unlink()
+            self.statusbar.showMessage("Organizing done successfully!")
+            self._status_owner = None
+            self._executing = False
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
 
 def entry():
     app = QApplication(sys.argv)

@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import List, Union
 
 from addict import Dict as edict
-from fluss import codecs
 from fluss.codecs import codec_from_filename, codec_from_name
 from fluss.config import global_config
+from fluss.cuesheet import CuesheetTrack
 from fluss.meta import Cuesheet, DiscMeta, TrackMeta
 from networkx import DiGraph
 from PySide6.QtCore import (QAbstractListModel, QAbstractTableModel,
@@ -26,7 +26,8 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFrame,
 
 from .targets import (CopyTarget, CropPictureTarget, MergeTracksTarget,
                       OrganizeTarget, TranscodePictureTarget,
-                      TranscodeTextTarget, TranscodeTrackTarget, VerifyAccurateRipTarget, _image_suffix_from_format)
+                      TranscodeTextTarget, TranscodeTrackTarget,
+                      VerifyAccurateRipTarget, _image_suffix_from_format)
 
 USED_COLOR = QBrush(QColor(200, 255, 200, 255))
 PRED_COLOR = QBrush(QColor(255, 200, 200, 255))
@@ -270,8 +271,9 @@ class TrackTableModel(QAbstractTableModel):
             self._columns = [self.SOURCE] + self._columns
         if meta.cuesheet:
             self._columns.append(self.PREGAP)
-            self._columns_editable.add(self.DURATION)
-            self._columns_editable.add(self.PREGAP)
+            # TODO: enable editing after implementing them
+            # self._columns_editable.add(self.DURATION)
+            # self._columns_editable.add(self.PREGAP)
 
         # logging order change
         self._track_order = list(range(max(len(track_length or []), len(self._meta.tracks))))
@@ -279,6 +281,13 @@ class TrackTableModel(QAbstractTableModel):
         self._track_source = track_source
 
     def data(self, index: QModelIndex, role: int):
+        def format_duration(seconds: float):
+            if seconds == 0:
+                return ""
+            s, ss = int(seconds), seconds-int(seconds)
+            fss = ("%.3f" % ss)[1:]
+            return f"{s//60}:{s%60:02}{fss} ({round(ss*75):02})"
+
         if role == Qt.DisplayRole or role == Qt.EditRole:
             if index.row() == 0:
                 # placeholder for editing all fields
@@ -302,15 +311,32 @@ class TrackTableModel(QAbstractTableModel):
                     else:
                         return self._track_source[actual_idx].output_name
                 elif self._columns[index.column()] == self.DURATION:
-                    actual_idx = self._track_order[i]
                     if self._meta.cuesheet:
-                        # TODO: implement, need to align cuesheet file name with input name
-                        return "N/A"
+                        if len(self._meta.cuesheet.files) == 1:
+                            tracks = next(iter(self._meta.cuesheet.files.values()))
+                            if i+2 in tracks: # track number in cuesheet starts from 1
+                                l = CuesheetTrack.duration(tracks[i+1], tracks[i+2]) / 75
+                            else:
+                                l = self._track_length[0] - tracks[i+1].index01 / 75
+                        else:
+                            raise NotImplementedError("Need to align cuesheet file name with input name")
                     else:
+                        actual_idx = self._track_order[i]
                         l = self._track_length[actual_idx]
-                    s, ss = int(l), l-int(l)
-                    fss = ("%.3f" % ss)[1:]
-                    return f"{s//60}:{s%60:02}{fss} ({round(ss*75):02})"
+                    return format_duration(l)
+                elif self._columns[index.column()] == self.PREGAP:
+                    if self._meta.cuesheet:
+                        if len(self._meta.cuesheet.files) == 1:
+                            tracks = next(iter(self._meta.cuesheet.files.values()))
+                            if i in tracks: # track number in cuesheet starts from 1
+                                l = CuesheetTrack.gap(tracks[i+1], tracks[i]) / 75
+                            else:
+                                l = CuesheetTrack.gap(tracks[i+1]) / 75
+                        else:
+                            raise NotImplementedError("Need to align cuesheet file name with input name")
+                    else:
+                        l = 0
+                    return format_duration(l)
                 else:
                     return "N/A"
 
@@ -676,12 +702,14 @@ async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None
                 cue_from_file = True
 
             # Extract other files
-            new_meta = DiscMeta.from_mutagen(file_tags)
-            self._meta.update(new_meta)
-            if not new_meta.tracks or all(t is None for t in new_meta.tracks):
-                # assume track number by input order
-                self._meta._reserve_tracks(i)
-                self._meta.update_track(i, TrackMeta.from_mutagen(file_tags))
+            if not self._meta.cuesheet:
+                new_meta = DiscMeta.from_mutagen(file_tags)
+                self._meta.update(new_meta)
+                if not new_meta.tracks or all(t is None for t in new_meta.tracks):
+                    # assume track number by input order
+                    self._meta._reserve_tracks(i)
+                    self._meta.update_track(i, TrackMeta.from_mutagen(file_tags))
+            # XXX: we might want to include tags when cuesheet tells nothing
 
     # fill table content
     layout.txt_album_artists.setText("; ".join(self._meta.artists))

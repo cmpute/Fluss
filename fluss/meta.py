@@ -10,7 +10,7 @@ from PIL import Image
 
 from fluss import cuesheet
 from fluss.cuesheet import Cuesheet, CuesheetTrack, _default_cuesheet_file
-
+from fluss.codecs import APETagFiles, ID3TagFiles
 
 def assert_field(v1, v2, field_name):
     assert not v1 or not v2 or v1 == v2, f"Inconsistent {field_name} between cuesheet and metadata!"
@@ -77,7 +77,16 @@ class TrackMeta:
         if not id3_meta.tags:
             return cls()
 
-        raise NotImplementedError("Parse metadata from ID3 tag is not implemented!")
+        cur_track = TrackMeta()
+        cur_updated = False
+        if 'TIT2' in id3_meta.tags:
+            cur_track.title = id3_meta.tags['TIT2'].text[0]
+            cur_updated = True
+        if 'TPE1' in id3_meta:
+            cur_track.artists.update(a for a in id3_meta.tags['TPE1'].text if a)
+            cur_updated = True
+
+        return cur_track if cur_updated else None
 
     @classmethod
     def from_mutagen(cls, mutagen_file: mutagen.FileType) -> "TrackMeta":
@@ -87,9 +96,9 @@ class TrackMeta:
         '''
         if isinstance(mutagen_file, FLAC):
             return cls.from_flac(mutagen_file)
-        elif isinstance(mutagen_file, APEv2File):
+        elif isinstance(mutagen_file, APETagFiles):
             return cls.from_ape(mutagen_file)
-        elif isinstance(mutagen_file, ID3FileType):
+        elif isinstance(mutagen_file, ID3TagFiles):
             return cls.from_id3(mutagen_file)
         else:
             raise ValueError("Unsupported mutagen format!")
@@ -236,11 +245,47 @@ class DiscMeta:
     def from_id3(cls, id3_meta: ID3FileType) -> "DiscMeta":
         '''
         Create metadata from media with ID3v2 tags
+
+        Mutagen reference: https://github.com/quodlibet/mutagen/blob/master/mutagen/easyid3.py#L470
         '''
         if not id3_meta.tags:
             return cls()
 
-        raise NotImplementedError("Parsing metadata from ID3 tags is not implemented!")
+        def get_first(name):
+            if name not in id3_meta.tags:
+                return None
+            value = id3_meta.tags[name].text
+            if value:
+                return value[0]
+            return None
+
+        meta = cls()
+        if "TALB" in id3_meta.tags:
+            meta.title = get_first("TALB")
+        if 'TPE2' in id3_meta.tags:
+            meta.artists.update(a for a in id3_meta.tags.get("TPE2").text if a)
+        if 'TDRC' in id3_meta.tags:
+            meta.date = get_first("TDRC").text
+
+        track_idx_str = get_first('TRCK')
+        if track_idx_str: # This is an flac for single track
+            if '/' in track_idx_str:
+                idx_str, total_str = track_idx_str.rsplit('/')
+                track_idx = int(idx_str) - 1
+                reserved_idx = int(total_str) - 1
+            else:
+                track_idx = int(track_idx_str) - 1
+                reserved_idx = track_idx
+            meta._reserve_tracks(reserved_idx)
+            meta.tracks[track_idx-1] = TrackMeta.from_flac(id3_meta)
+
+        # TODO: get cuesheet
+
+        # get cover
+        if "APIC:" in id3_meta.tags:
+            meta.cover = id3_meta["APIC:"].data
+
+        return meta
 
     @classmethod
     def from_mutagen(cls, mutagen_file: mutagen.FileType) -> "DiscMeta":
@@ -250,9 +295,9 @@ class DiscMeta:
         '''
         if isinstance(mutagen_file, FLAC):
             return cls.from_flac(mutagen_file)
-        elif isinstance(mutagen_file, APEv2File):
+        elif isinstance(mutagen_file, APETagFiles):
             return cls.from_ape(mutagen_file)
-        elif isinstance(mutagen_file, ID3FileType):
+        elif isinstance(mutagen_file, ID3TagFiles):
             return cls.from_id3(mutagen_file)
         else:
             raise ValueError("Unsupported mutagen format: " + str(type(mutagen_file)))
@@ -310,7 +355,7 @@ class DiscMeta:
     def full_artist(self) -> str:
         return ', '.join(self.artists) if self.artists else None
 
-    def to_flac(self, flac_meta: FLAC):
+    def to_flac(self, flac_meta: FLAC) -> None:
         def add_if_exist(obj, tag_key):
             if obj:
                 flac_meta.tags[tag_key] = obj
@@ -338,10 +383,12 @@ class DiscMeta:
                 add_if_exist(self.cuesheet.catalog, 'Catalog')
                 add_if_exist(self.cuesheet.rems.get('COMMENT', None), 'Comment')
 
-    def to_id3(self, id3_meta: ID3):
+        flac_meta.save()
+
+    def to_id3(self, id3_meta: ID3) -> None:
         raise NotImplementedError("Convert metadata to FLAC is not implemented!")
 
-    def to_ape(self, ape_meta: APEv2File):
+    def to_ape(self, ape_meta: APEv2File) -> None:
         def add_if_exist(obj, tag_key):
             if obj is None:
                 return
@@ -357,7 +404,8 @@ class DiscMeta:
 
         add_if_exist(self.title, 'Album')
         add_if_exist(self.full_artist, 'Album artist')
-        add_if_exist(b'fluss.jpg\x00' + self.cover, 'Cover Art (Front)')
+        if self.cover:
+            add_if_exist(b'fluss.jpg\x00' + self.cover, 'Cover Art (Front)')
         add_if_exist(self.genre, 'Genre')
         add_if_exist(self.date, 'Year')
         if self.cuesheet:
@@ -366,13 +414,15 @@ class DiscMeta:
             add_if_exist(self.cuesheet.rems.get('UPC', None), 'UPC')
             add_if_exist(self.cuesheet.rems.get('COMMENT', None), 'Comment')
 
-    def to_mutagen(self, mutagen_file: mutagen.FileType):
+        ape_meta.save()
+
+    def to_mutagen(self, mutagen_file: mutagen.FileType) -> None:
         if isinstance(mutagen_file, FLAC):
-            return self.to_flac(mutagen_file)
-        elif isinstance(mutagen_file, APEv2File):
-            return self.to_ape(mutagen_file)
-        elif isinstance(mutagen_file, ID3):
-            return self.to_id3(mutagen_file)
+            self.to_flac(mutagen_file)
+        elif isinstance(mutagen_file, APETagFiles):
+            self.to_ape(mutagen_file)
+        elif isinstance(mutagen_file, ID3TagFiles):
+            self.to_id3(mutagen_file)
         else:
             raise ValueError("Unsupported mutagen format!")
 
@@ -464,9 +514,9 @@ class AlbumMeta: # corresponds to meta.yaml
             if getattr(self, key):
                 meta_dict[key] = getattr(self, key)
         if self.artists:
-            meta_dict.artists = list(self.artists)
+            meta_dict['artists'] = list(self.artists)
         if self.associations:
-            meta_dict.associations = dict(self.associations)
+            meta_dict['associations'] = dict(self.associations)
 
         obj = dict(meta=meta_dict)
         for folder, fmeta in self.folders.items():

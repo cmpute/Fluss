@@ -1,9 +1,9 @@
 from ast import parse
-from collections import OrderedDict, defaultdict, namedtuple
+from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from os import linesep
 from pathlib import Path
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 import chardet
 from chardet.enums import LanguageFilter
@@ -57,6 +57,22 @@ class CuesheetTrack(object):
         return f"{self.title} / {self.performer}"
     def __repr__(self):
         return f"<Cuetrack {self.title}>"
+
+    @staticmethod
+    def duration(track: "CuesheetTrack", next_track: "CuesheetTrack") -> int:
+        if next_track.index00:
+            return next_track.index00 - track.index01
+        return next_track.index01 - track.index01
+
+    @staticmethod
+    def gap(track: "CuesheetTrack", prev_track: Optional["CuesheetTrack"] = None) -> int:
+        if track.pregap:
+            return track.pregap
+        if track.index00:
+            return track.index01 - track.index00
+        if prev_track and prev_track.postgap:
+            return prev_track.postgap
+        return 0
 
 _default_cuesheet_file = "CDImage.wav"
 
@@ -308,7 +324,7 @@ class Cuesheet:
                 if tr.index01 is not None:
                     lines.append(f'    INDEX 01 ' + _print_index_point(tr.index01))
                 if tr.isrc is not None:
-                    lines.append(f'    ISRC ' + _print_index_point(tr.isrc))
+                    lines.append(f'    ISRC ' + tr.isrc)
         return linesep.join(lines)
 
     def to_file(self, path: Union[str, Path]) -> None:
