@@ -68,9 +68,9 @@ class OrganizeTarget:
         '''
         try:
             data = await self.apply_stream(input_root, output_root)
+            Path(output_root, self.output_name).write_bytes(data.getvalue())
         except Exception as e:
             traceback.print_exc()
-        Path(output_root, self.output_name).write_bytes(data.getvalue())
 
 
 def _split_name(target: Union[str, OrganizeTarget]):
@@ -158,10 +158,12 @@ class TranscodeTrackTarget(OrganizeTarget):
     def __repr__(self):
         return "<TranscodeTrackTarget output=%s>" % self.output_name
 
-    def apply(self, input_root, output_root):
-        convert_track(
+    async def apply(self, input_root, output_root, progress_callback: Callable[[float], None] = None):
+        await convert_track(
             Path(input_root, self._input[0]),
-            Path(output_root, self.output_name)
+            Path(output_root, self.output_name),
+            codec_out=self._codec,
+            progress_callback=progress_callback
         )
 
 
@@ -271,6 +273,7 @@ class MergeTracksTarget(OrganizeTarget):
                 Path(input_root, self._tracks[0]),
                 Path(output_root, self.output_name),
                 meta=self._meta,
+                codec_out=self._codec,
                 progress_callback=progress_callback
             )
         else:
@@ -278,6 +281,7 @@ class MergeTracksTarget(OrganizeTarget):
                 [Path(input_root, f) for f in self._tracks],
                 Path(output_root, self.output_name),
                 meta=self._meta,
+                codec_out=self._codec,
                 progress_callback=progress_callback
             )
 

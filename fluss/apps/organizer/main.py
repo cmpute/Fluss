@@ -6,7 +6,7 @@ from collections import defaultdict
 from itertools import islice
 from os.path import commonprefix
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List
 
 import yaml
 from addict import Dict as edict
@@ -551,10 +551,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # get output folder
             folder_map = {}
+            disc_targets = defaultdict(list)
             for i in range(self.tab_folders.count()):
                 folder = self.tab_folders.tabText(i)
                 for target in self.tab_folders.widget(i).model():
                     folder_map[target] = folder
+                    if isinstance(target, MergeTracksTarget):
+                        disc_targets[folder].append(target)
+
+            # add disc numbers
+            for folder, targets in disc_targets.items():
+                targets.sort(key=lambda t: t._outstem.lower())
+                for i, t in enumerate(targets):
+                    t._meta.discnumber = i + 1
 
             # execute targets
             output_path = Path(self.txt_output_path.text(), self.formattedOutputName)
@@ -591,7 +600,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         except Exception as e:
             import traceback
-            traceback.print_exc()
+            stack = traceback.format_exc()
+            msgbox = QMessageBox(self)
+            msgbox.setWindowTitle("Execution failed")
+            msgbox.setIcon(QMessageBox.Critical)
+            msgbox.setText(stack)
+            msgbox.exec_()
 
 def entry():
     app = QApplication(sys.argv)

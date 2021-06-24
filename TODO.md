@@ -1,5 +1,4 @@
 - [ ] support DSD stream load and save
 - [ ] test HiRes support with http://www.2l.no/hires/
 - [ ] Add "open directory with organizer" to right click menu
-- [ ] Support automatic disc number generation
-- [ ] Support graph parallel execution
+- [ ] Support graph parallel execution (need to display progress in a better way)

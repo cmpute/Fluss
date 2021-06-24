@@ -4,7 +4,6 @@ from typing import Callable, List, Tuple, Union, Any
 import asyncio
 from PIL.Image import new
 
-import mutagen
 from fluss import codecs
 from fluss.cuesheet import Cuesheet, _default_cuesheet_file
 from fluss.meta import DiscMeta

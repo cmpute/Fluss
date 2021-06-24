@@ -12,9 +12,11 @@ global_config.path.arcue = r"C:\Program Files (x86)\CUETools\CUETools_2.1.6\ArCu
 
 # encoder preset configs
 global_config.audio_codecs.wavpack.type = "wavpack"
-global_config.audio_codecs.wavpack.encode = ["-m"] # TODO: enable high compression as default
+global_config.audio_codecs.wavpack.encode = ["-m"]
 global_config.audio_codecs.wavpack_hybrid.type = "wavpack"
-global_config.audio_codecs.wavpack_hybrid.encode = ["-m", "-b192"]
+global_config.audio_codecs.wavpack_hybrid.encode = ["-m", "-b192", "-c"]
+global_config.audio_codecs.wavpack_hybrid_high.type = "wavpack"
+global_config.audio_codecs.wavpack_hybrid_high.encode = ["-m", "-h", "-b192", "-c", "-x"]
 global_config.audio_codecs.flac.type = "flac"
 global_config.audio_codecs.flac.encode = []
 global_config.image_codecs.png.type = "png"
@@ -29,7 +31,7 @@ global_config.organizer.output_format.indie_collection = "[{partnumber}][{yymmdd
 
 # define default output codec for various contents
 global_config.organizer.output_codec.image = "png"
-global_config.organizer.output_codec.audio = "wavpack_hybrid"
+global_config.organizer.output_codec.audio = "wavpack_hybrid_high"
 global_config.organizer.output_codec.text = "utf-8-sig"
 
 # some other options

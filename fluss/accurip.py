@@ -36,14 +36,18 @@ def parse_accurip(accurip_log: Union[str, bytes]) -> dict:
         ctdb_status = parse.parse("        [{:x}] ({1}) {2}", l)
         if ctdb_status:
             ctdbid, conf, status = ctdb_status
+            conf_num, conf_denum = conf.split("/")
+            conf = int(conf_num) / max(1, int(conf_denum))
             result[ctdbid] = conf, status
-            if "Differs" in status:
+            if "differs" in status: # differ in matching
+                result.fail = True
+            if "no match" in status and conf < 0.4: # completely no match
                 result.fail = True
 
-        if "NOT ACCURATE" in l:  # AccurateRip failed
+        if "not accurate" in l.lower():  # AccurateRip failed
             result.fail = True
 
-        if "mismatch" in l:  # DISCID mismatch
+        if "mismatch" in l.lower():  # DISCID mismatch
             result.fail = True
 
     return result

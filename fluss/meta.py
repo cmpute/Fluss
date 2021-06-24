@@ -113,6 +113,7 @@ class DiscMeta:
     date: str
     tracks: List[TrackMeta]
     cover: bytes
+    discnumber: int
     partnumber: str
 
     _cuesheet: Cuesheet
@@ -127,6 +128,7 @@ class DiscMeta:
         self.tracks = list()
         self.cover = None
         self.partnumber = None
+        self.discnumber = None
 
     def __str__(self) -> str:
         str_tracks = [f"\n\t{i+1:02} " + str(t).replace("\n", "\n\t") for i, t in enumerate(self.tracks)] # indent
@@ -193,11 +195,27 @@ class DiscMeta:
             value = flac_tags[name][0]
             return value or None
 
+        # parse common fields
         meta.title = get_first('ALBUM')
         if 'ALBUMARTIST' in flac_tags:
             meta.artists.update((a for a in flac_tags.get('ALBUMARTIST') if a))
+        if 'ALBUM ARTIST' in flac_tags:
+            meta.artists.update((a for a in flac_tags.get('ALBUM ARTIST') if a))
         meta.date = get_first('DATE')
 
+        # parse disc numbers
+        disc_str = get_first('DISC')
+        if disc_str:
+            if '/' in disc_str:
+                discnumber, _ = disc_str.rsplit('/')
+                meta.discnumber = int(discnumber)
+            else:
+                meta.discnumber = int(disc_str)
+        discnum_str = get_first('DISCNUMBER')
+        if discnum_str:
+            meta.discnumber = int(discnum_str)
+
+        # prase track numbers
         track_idx_str = get_first('TRACKNUMBER')
         if track_idx_str: # This is an flac for single track
             if '/' in track_idx_str:
@@ -260,6 +278,8 @@ class DiscMeta:
             return None
 
         meta = cls()
+
+        # parse common fields
         if "TALB" in id3_meta.tags:
             meta.title = get_first("TALB")
         if 'TPE2' in id3_meta.tags:
@@ -267,8 +287,14 @@ class DiscMeta:
         if 'TDRC' in id3_meta.tags:
             meta.date = get_first("TDRC").text
 
+        # parse disc numbers
+        discnum_str = get_first('TPOS')
+        if discnum_str:
+            meta.discnumber = int(discnum_str)
+
+        # parse track numbers
         track_idx_str = get_first('TRCK')
-        if track_idx_str: # This is an flac for single track
+        if track_idx_str: # This is an id3 file for single track
             if '/' in track_idx_str:
                 idx_str, total_str = track_idx_str.rsplit('/')
                 track_idx = int(idx_str) - 1
@@ -365,6 +391,8 @@ class DiscMeta:
         add_if_exist(self.date, 'DATE')
         if self.artists:
             flac_meta.tags['ALBUMARTIST'] = list(self.artists)
+        if self.discnumber is not None:
+            flac_meta.tags['DISCNUMBER'] = str(self.discnumber)
 
         if self.cover:
             image = Image.open(BytesIO(self.cover))
@@ -402,17 +430,19 @@ class DiscMeta:
         if ape_meta.tags is None:
             ape_meta.add_tags()
 
-        add_if_exist(self.title, 'Album')
-        add_if_exist(self.full_artist, 'Album artist')
+        add_if_exist(self.title, 'ALBUM')
+        add_if_exist(self.full_artist, 'ALBUMARTIST')
         if self.cover:
             add_if_exist(b'fluss.jpg\x00' + self.cover, 'Cover Art (Front)')
-        add_if_exist(self.genre, 'Genre')
-        add_if_exist(self.date, 'Year')
+        add_if_exist(self.genre, 'GENRE')
+        add_if_exist(self.date, 'YEAR')
+        if self.discnumber is not None:
+            add_if_exist(str(self.discnumber), 'DISCNUMBER')
         if self.cuesheet:
-            ape_meta.tags['Cuesheet'] = str(self.cuesheet)
-            add_if_exist(self.cuesheet.catalog, 'Catalog')
+            ape_meta.tags['CUESHEET'] = str(self.cuesheet)
+            add_if_exist(self.cuesheet.catalog, 'CATALOG')
             add_if_exist(self.cuesheet.rems.get('UPC', None), 'UPC')
-            add_if_exist(self.cuesheet.rems.get('COMMENT', None), 'Comment')
+            add_if_exist(self.cuesheet.rems.get('COMMENT', None), 'COMMENT')
 
         ape_meta.save()
 
