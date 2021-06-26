@@ -46,6 +46,8 @@ def _get_temp_file(prefix='', ext=None):
         fname += ext
     return tmpfolder / fname
 
+def joint_command_args(*args):
+    return '"' + '" "'.join(a for a in args) + '"'
 
 class AudioCodec:
     suffix: str
@@ -157,7 +159,7 @@ class flac(AudioCodec):
             args = [C.path.flac, "-fV", "-", "-o", _resolve_pathstr(fout)] + self.encode_args
             stderr = subprocess.PIPE
 
-        proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.PIPE, stderr=stderr)
+        proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stdin=subprocess.PIPE, stderr=stderr)
 
         if progress_callback is not None:
             ptask = self._report_encode_progress(proc.stderr,
@@ -191,7 +193,7 @@ class flac(AudioCodec):
             args = [C.path.flac, "-dc", _resolve_pathstr(fin), "-o", str(ftmp)]
             stderr = subprocess.PIPE
 
-        proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
+        proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stderr=stderr)
 
         if progress_callback is not None:
             ptask = self._report_encode_progress(proc.stderr,
@@ -235,7 +237,7 @@ class wavpack(AudioCodec):
             args = [C.path.wavpack, '-y'] + self.encode_args + ["-", _resolve_pathstr(fout)]
             stderr = subprocess.PIPE
 
-        proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.PIPE, stderr=stderr)
+        proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stdin=subprocess.PIPE, stderr=stderr)
 
         if progress_callback is not None:
             ptask = self._report_encode_progress(proc.stderr,
@@ -267,7 +269,7 @@ class wavpack(AudioCodec):
             args = [C.path.wvunpack, '-y', _resolve_pathstr(fin), str(ftmp)]
             stderr = subprocess.PIPE
 
-        proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
+        proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stderr=stderr)
 
         if progress_callback is not None:
             ptask = self._report_encode_progress(proc.stderr,
@@ -314,7 +316,7 @@ class monkeysaudio(AudioCodec):
 
             args = [C.path.mac, str(tmp_file), _resolve_pathstr(fout)] + self.encode_args
             stderr = None if progress_callback is None else subprocess.PIPE
-            proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
+            proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stderr=stderr)
 
             if progress_callback is not None:
                 ptask = self._report_encode_progress(proc.stderr,
@@ -342,7 +344,7 @@ class monkeysaudio(AudioCodec):
 
         args = [C.path.mac, _resolve_pathstr(fin), str(ftmp), '-d']
         stderr = None if progress_callback is None else subprocess.PIPE
-        proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
+        proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stderr=stderr)
 
         if progress_callback is not None:
             ptask = self._report_encode_progress(proc.stderr,
@@ -365,6 +367,7 @@ class monkeysaudio(AudioCodec):
     def mutagen(cls, fin: str) -> mutagen.wavpack.WavPack:
         return mutagen.monkeysaudio.MonkeysAudio(fin)
 
+# TODO: tta encoder seems to buffer stderr output
 class trueaudio(AudioCodec):
     suffix = "tta"
 
@@ -379,7 +382,7 @@ class trueaudio(AudioCodec):
     async def encode_async(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, None]:
         args = [C.path.tta, "-e"] + self.encode_args + ["-", _resolve_pathstr(fout)]
         stderr = subprocess.DEVNULL if progress_callback is None else subprocess.PIPE
-        proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.PIPE, stderr=stderr)
+        proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stdin=subprocess.PIPE, stderr=stderr)
 
         if progress_callback is not None:
             ptask = self._report_encode_progress(proc.stderr,
@@ -406,7 +409,7 @@ class trueaudio(AudioCodec):
 
         args = [C.path.tta, "-d", _resolve_pathstr(fin), str(ftmp)]
         stderr = subprocess.DEVNULL if progress_callback is None else subprocess.PIPE
-        proc = await asyncio.create_subprocess_exec(*args, stderr=stderr)
+        proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stderr=stderr)
 
         if progress_callback is not None:
             ptask = self._report_encode_progress(proc.stderr,

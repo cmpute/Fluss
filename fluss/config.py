@@ -1,4 +1,6 @@
+from pathlib import Path
 import addict
+import yaml
 
 global_config = addict.Dict()
 
@@ -35,15 +37,25 @@ global_config.organizer.output_codec.audio = "wavpack_hybrid_high"
 global_config.organizer.output_codec.text = "utf-8-sig"
 
 # some other options
+global_config.organizer.default_output_dir = r"D:/Temp/organized"
 global_config.organizer.artist_splitter = r",\s+|;\s+"  # regex expression for splitting artist
 global_config.organizer.keyword_splitter = r';| - |\[|\]|\(|\)'  # regex expression for splitting keyword
 
-# TODO: load config from json/yaml/toml
+# load config from file
+config_path = Path("~/.fluss.yaml").expanduser()
+if config_path.exists():
+    with config_path.open("r", encoding="utf-8-sig") as fin:
+        saved_config = yaml.safe_load(fin)
+        global_config.update(addict.Dict(saved_config))
+else:
+    with config_path.open("w", encoding="utf-8-sig") as fout:
+        fout.write("# This file contains the configs for Fluss organizer.\n")
+        yaml.dump(global_config.to_dict(), fout, encoding="utf-8", allow_unicode=True)
 
 # setting up logging
 import logging
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                     datefmt='%m-%d %H:%M:%S',
-                    filename='fluss.log',
+                    filename=Path("~/.fluss.log").expanduser(),
                     filemode='w')

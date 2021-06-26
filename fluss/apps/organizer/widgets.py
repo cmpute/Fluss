@@ -5,6 +5,7 @@ import traceback
 import typing
 from pathlib import Path
 from typing import List, Union
+import logging
 
 from addict import Dict as edict
 from fluss.codecs import codec_from_filename, codec_from_name
@@ -21,7 +22,7 @@ from PySide6.QtGui import (QBrush, QColor, QDropEvent, QImage, QKeyEvent,
 from PySide6.QtWidgets import (QApplication, QDialog, QFrame,
                                QGraphicsLineItem, QGraphicsPixmapItem,
                                QGraphicsRectItem, QGraphicsScene,
-                               QGraphicsView, QLabel, QLineEdit, QProxyStyle,
+                               QGraphicsView, QLabel, QLineEdit, QMessageBox, QProxyStyle,
                                QStyleOption, QTableView, QWidget)
 
 from .targets import (CopyTarget, CropPictureTarget, MergeTracksTarget,
@@ -29,6 +30,7 @@ from .targets import (CopyTarget, CropPictureTarget, MergeTracksTarget,
                       TranscodeTextTarget, TranscodeTrackTarget,
                       VerifyAccurateRipTarget, _image_suffix_from_format)
 
+_logger = logging.getLogger("fluss.organizer")
 USED_COLOR = QBrush(QColor(200, 255, 200, 255))
 PRED_COLOR = QBrush(QColor(255, 200, 200, 255))
 SUCC_COLOR = QBrush(QColor(200, 200, 255, 255))
@@ -681,10 +683,22 @@ async def editMergeTracksTarget(self: MergeTracksTarget, input_root: Path = None
         self._meta = DiscMeta()
         if self._cue:
             if isinstance(self._cue, str):
-                cs = Cuesheet.from_file(input_root / self._cue)
+                try:
+                    cs = Cuesheet.from_file(input_root / self._cue)
+                except UnicodeDecodeError as e:
+                    _logger.error("Cuesheet decoding failed!")
+                    msgbox = QMessageBox()
+                    msgbox.setWindowTitle("Cuesheet decoding failed!")
+                    msgbox.setIcon(QMessageBox.Critical)
+                    msgbox.setText("Failed to decode cuesheet (reason: %s), please use TranscodeTextTarget to fix encoding first!" % str(e))
+                    msgbox.exec_()
+
+                    # reset
+                    self._meta = None
+                    return
             else: # isinstance(self._cue, OrganizeTarget):
                 assert isinstance(self._cue, (CopyTarget, TranscodeTextTarget))
-                cs = await self._cue.apply_stream(input_root)
+                cs = await self._cue.apply_stream(input_root, output_root)
                 cs = Cuesheet.parse(cs.getvalue().decode('utf-8-sig'))
             self._meta.update(DiscMeta.from_cuesheet(cs))
             self._meta.cuesheet = cs

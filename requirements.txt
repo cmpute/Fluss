@@ -7,3 +7,4 @@ pillow
 qasync
 python-dateutil
 pyyaml
+fire

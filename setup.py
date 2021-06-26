@@ -6,7 +6,10 @@ setup(
     packages=find_packages(),
     entry_points={
         'console_scripts': [
-            'fluss-organizer = fluss.apps.organizer.main:entry',
+            'fluss = fluss.apps.__init__:apps_entry',
         ],
+        'gui_scripts': [
+            'fluss-organizer = fluss.apps.organizer.main:entry',
+        ]
     },
 )

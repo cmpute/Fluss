@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import re
 import sys
@@ -6,7 +7,7 @@ from collections import defaultdict
 from itertools import islice
 from os.path import commonprefix
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import yaml
 from addict import Dict as edict
@@ -27,11 +28,13 @@ from .targets import MergeTracksTarget, OrganizeTarget, target_types
 from .widgets import (PRED_COLOR, USED_COLOR, TargetListModel, _get_icon,
                       editTarget)
 
+_logger = logging.getLogger("fluss.organizer")
+
 # TODO: add help (as below)
 # - you can drag file from input to output by pressing alt
 
 class MainWindow(QMainWindow, Ui_MainWindow):
-    def __init__(self):
+    def __init__(self, initial_dir: str = None):
         super().__init__()
 
         self._input_folder = None
@@ -55,8 +58,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cbox_output_type.addItem(format)
         self.cbox_output_type.setCurrentIndex(0)
 
-        # TODO: For debug
-        self.txt_input_path.setText(r"E:\#Music\MUSIC(整碟下载320K-Lossles)\同人专辑\[合集]K-waves LAB\★★(C85)(同人音楽)[k-waves LAB] Eorzean Minstrels' Story (flac+inCue+log)[EAC by 子檀]")
+        if initial_dir:
+            self.txt_input_path.setText(initial_dir)
+        if global_config.organizer.default_output_dir:
+            self.txt_output_path.setText(global_config.organizer.default_output_dir)
 
     def setupSignals(self):
         self.btn_input_browse.clicked.connect(self.browseInput)
@@ -84,8 +89,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def applyButtonEnter(self, event):
         if self._status_owner is None:
             self._status_owner = self.btn_apply
-            outpath = Path(self.txt_output_path.text(), self.formattedOutputName)
-            self.statusbar.showMessage("Start conversion to " + str(outpath))
+            if self.formattedOutputName:
+                outpath = Path(self.txt_output_path.text(), self.formattedOutputName)
+                self.statusbar.showMessage("Start conversion to " + str(outpath))
 
     def applyButtonLeave(self, event):
         if self._status_owner == self.btn_apply:
@@ -97,6 +103,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.flushFolderMeta()
 
         if self.cbox_output_type.currentIndex() < 0:
+            return ""
+
+        if not self._meta:
             return ""
 
         if self._meta.date:
@@ -167,14 +176,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if index is None:
             index = self.tab_folders.currentIndex()
 
-        target_meta = self._meta.folders[self.tab_folders.tabText(index)]
-        target_meta.catalog = self.txt_catalog.text()
-        target_meta.partnumber = self.txt_partnumber.text()
-        target_meta.edition = self.txt_edition.text()
-        target_meta.tool = self.txt_tool.text()
-        target_meta.source = self.txt_source.text()
-        target_meta.ripper = self.txt_ripper.text()
-        target_meta.comment = self.txt_comment.toPlainText()
+        if self._meta:
+            target_meta = self._meta.folders[self.tab_folders.tabText(index)]
+            target_meta.catalog = self.txt_catalog.text()
+            target_meta.partnumber = self.txt_partnumber.text()
+            target_meta.edition = self.txt_edition.text()
+            target_meta.tool = self.txt_tool.text()
+            target_meta.source = self.txt_source.text()
+            target_meta.ripper = self.txt_ripper.text()
+            target_meta.comment = self.txt_comment.toPlainText()
 
     def listOutputViewLeave(self, event):
         self._shared_states.hovered = None
@@ -456,7 +466,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.widget_keywords.extendKeywords(keywords)
 
         # default output path
-        self.txt_output_path.setText(str(path.parent / "organized"))
+        if not global_config.organizer.default_output_dir:
+            self.txt_output_path.setText(str(path.parent / "organized"))
 
     def reset(self):
         '''
@@ -588,8 +599,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # create meta.yaml
             meta_dict = self._meta.to_dict()
-            with Path(output_path, "meta.yaml").open("w") as fout:
-                yaml.dump(meta_dict, fout)
+            with Path(output_path, "meta.yaml").open("w", encoding="utf-8-sig") as fout:
+                yaml.dump(meta_dict, fout, encoding="utf-8", allow_unicode=True)
 
             # clean up
             for f in files_to_remove:
@@ -601,21 +612,62 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             import traceback
             stack = traceback.format_exc()
+            _logger.error("Pipeline execution failed. Full stack:\n" + stack)
+
             msgbox = QMessageBox(self)
             msgbox.setWindowTitle("Execution failed")
             msgbox.setIcon(QMessageBox.Critical)
-            msgbox.setText(stack)
+            msgbox.setText("Reason: ", str(e))
             msgbox.exec_()
 
-def entry():
-    app = QApplication(sys.argv)
-    loop = QEventLoop(app)
-    asyncio.set_event_loop(loop)
+def register_context_menu(uninstall: bool = False):
+    import distutils.sysconfig, winreg
+    pre = distutils.sysconfig.get_config_var("prefix")
+    bindir = os.path.join(pre, "Scripts", "fluss-organizer.exe")
 
-    with loop:
-        window = MainWindow()
-        window.show()
-        loop.run_forever()
+    REG_PATH = "SOFTWARE\\Classes\\Directory\\shell\\Fluss"
+    if uninstall:
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, REG_PATH + "\\command")
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, REG_PATH)
+    else:
+        rkey = winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
+        winreg.SetValueEx(rkey, "", 0, winreg.REG_EXPAND_SZ, f'Organize with Fluss')
+        command_key = winreg.CreateKey(rkey, "command")
+        winreg.SetValueEx(command_key, "", 0, winreg.REG_EXPAND_SZ, f'"{bindir}" -d "%V"')
+        winreg.CloseKey(rkey)
+
+def entry_with_args(initial_dir: Optional[str] = None,
+                    install_context: Optional[bool] = False,
+                    uninstall_context: Optional[bool] = False,):
+    '''
+    :param initial_dir: Initial directory
+    :param install_context: Install the organizer in right click context menu (Windows)
+    :param uninstall_context: Uninstall the organizer in right click context menu (Windows)
+    '''
+    if install_context:
+        register_context_menu()
+    elif uninstall_context:
+        register_context_menu(uninstall=True)
+    else:
+        app = QApplication(sys.argv)
+        loop = QEventLoop(app)
+        asyncio.set_event_loop(loop)
+
+        with loop:
+            window = MainWindow(initial_dir)
+            window.show()
+            loop.run_forever()
+
+def entry():
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser()
+    parser.add_argument("--initial-dir", "-d", help="Initial directory")
+    parser.add_argument("--install-context", "-i", action="store_true", help="Install the organizer in right click context menu (Windows)")
+    parser.add_argument("--uninstall-context", "-u", action="store_true", help="Uninstall the organizer in right click context menu (Windows)")
+    args = parser.parse_args()
+
+    entry_with_args(**vars(args))
 
 if __name__ == "__main__":
     exit(entry())
