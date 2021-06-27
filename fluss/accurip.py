@@ -12,8 +12,8 @@ from .config import global_config
 
 
 async def verify_accurip(input_file: Union[str, Path]) -> str:
-    args = [global_config.path.arcue, "-v", str(input_file)]
-    process = await asyncio.create_subprocess_exec(*args, stdout=subprocess.PIPE)
+    args = f'"{global_config.path.arcue}" -v "{input_file}"'
+    process = await asyncio.create_subprocess_shell(args, stdout=subprocess.PIPE)
     rt = await process.wait()
     if rt != 0:
         raise RuntimeError("ARCue returned non-zero!")

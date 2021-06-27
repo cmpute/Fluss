@@ -39,12 +39,11 @@ class TrackMeta:
         if meta is None:
             return
 
-        for key in ['title']:
+        for key in ['title', 'artists']:
             new_value = getattr(meta, key, None)
             old_value = getattr(self, key, None)
             if (overwrite and new_value) or (not overwrite and not old_value):
                 setattr(self, key, new_value)
-        self.artists.update(meta.artists)
 
     @classmethod
     def from_flac(cls, flac_meta: FLAC) -> "TrackMeta":
@@ -159,12 +158,11 @@ class DiscMeta:
             otherwise keep not modified
         '''
         # update simple fields
-        for key in ['title', 'genre', 'date', 'cover']:
+        for key in ['title', 'genre', 'date', 'cover', 'artists']:
             new_value = getattr(meta, key, None)
             old_value = getattr(self, key, None)
             if (overwrite and new_value) or (not overwrite and not old_value):
                 setattr(self, key, new_value)
-        self.artists.update(meta.artists)
         if self._cuesheet is None:
             self._cuesheet = meta._cuesheet.copy() if meta._cuesheet else None
         elif meta._cuesheet is not None:
@@ -226,7 +224,7 @@ class DiscMeta:
                 track_idx = int(track_idx_str) - 1
                 reserved_idx = track_idx
             meta._reserve_tracks(reserved_idx)
-            meta.tracks[track_idx-1] = TrackMeta.from_flac(flac_meta)
+            meta.tracks[track_idx] = TrackMeta.from_flac(flac_meta)
 
         # get cuesheet
         if flac_meta.cuesheet:
@@ -303,7 +301,7 @@ class DiscMeta:
                 track_idx = int(track_idx_str) - 1
                 reserved_idx = track_idx
             meta._reserve_tracks(reserved_idx)
-            meta.tracks[track_idx-1] = TrackMeta.from_flac(id3_meta)
+            meta.tracks[track_idx] = TrackMeta.from_flac(id3_meta)
 
         # TODO: get cuesheet
 
@@ -552,3 +550,9 @@ class AlbumMeta: # corresponds to meta.yaml
         for folder, fmeta in self.folders.items():
             obj[folder] = fmeta.to_dict()
         return obj
+
+    def update(self, kv: dict, overwrite=True):
+        for key, val in kv.items():
+            old_value = getattr(self, key, None)
+            if (overwrite and val) or (not overwrite and not old_value):
+                setattr(self, key, val)

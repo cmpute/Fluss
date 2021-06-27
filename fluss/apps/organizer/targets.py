@@ -75,14 +75,17 @@ class OrganizeTarget:
 
 def _split_name(target: Union[str, OrganizeTarget]):
     if isinstance(target, str):
-        name = target
-    else: # OrganizeTarget
+        name = PurePath(target).name
+    elif isinstance(target, OrganizeTarget):
         name = target.output_name
+    else:
+        raise ValueError("Incorrect target type!")
+
     split = name.rsplit(".", 1)
     if len(split) == 1:
         return split[0], ""
     else:
-        return split
+        return split[0], split[1].lower()  # return lower case suffix by default
 
 class CopyTarget(OrganizeTarget):    
     description = "Copy"
@@ -91,12 +94,8 @@ class CopyTarget(OrganizeTarget):
         super().__init__(input_files)
         assert len(self._input) == 1, "CopyTarget only accept one input!"
 
-        if isinstance(self._input[0], str):
-            self._outname = PurePath(self._input[0]).name
-        elif isinstance(self._input[0], OrganizeTarget):
-            self._outname = self._input[0].output_name
-        else:
-            raise ValueError("Incorrect input type!")
+        stem, suffix = _split_name(self._input[0])
+        self._outname = stem + '.' + suffix if suffix else stem
 
     @classmethod
     def validate(self, input_files):
@@ -188,21 +187,23 @@ class MergeTracksTarget(OrganizeTarget):
             raise ValueError("Not all input files are accepted.")
 
         # sort tracks lexically
-        def track_key(track):
-            name = track if isinstance(track, str) else track.output_name
-            nums = []
-            for i, c in enumerate(name):
-                if c.isspace():
-                    continue
-                if c.isdigit():
-                    nums.append(c)
-                else:
-                    break
-            lexical_name = chr(int(''.join(nums))) + name[i:] if nums else name
-            return lexical_name
-        self._tracks.sort(key=track_key)
+        self._tracks.sort(key=MergeTracksTarget._track_key)
 
         self._meta = None
+
+    @staticmethod
+    def _track_key(track):
+        name = track if isinstance(track, str) else track.output_name
+        nums = []
+        for i, c in enumerate(name):
+            if c.isspace():
+                continue
+            if c.isdigit():
+                nums.append(c)
+            else:
+                break
+        lexical_name = chr(int(''.join(nums))) + name[i:] if nums else name
+        return lexical_name
 
     @staticmethod
     def _sort_files(input_files):
@@ -265,8 +266,13 @@ class MergeTracksTarget(OrganizeTarget):
         return "<MergeTracksTarget output=%s>" % self.output_name
 
     async def apply(self, input_root, output_root, progress_callback: Callable[[float], None] = None):
-        if self._cover:
-            self._meta.cover = Path(input_root, self._cover).read_bytes()
+        if isinstance(self._cover, str):
+            cover_path = Path(input_root, self._cover)
+        elif isinstance(self._cover, OrganizeTarget):
+            cover_path = Path(output_root, self._cover.output_name)
+        else:
+            raise ValueError("Unrecognized cover input!")
+        self._meta.cover = cover_path.read_bytes()
 
         if len(self._tracks) == 1:
             await convert_track(
@@ -292,7 +298,7 @@ class MergeTracksTarget(OrganizeTarget):
 class TranscodeTextTarget(OrganizeTarget):
     ''' Support text encoding fixing '''
     description = "Transcode Text"
-    valid_encodings = ['utf-8', 'utf-8-sig', 'gb2312', 'gbk', 'big5', 'big5hkscs', 'shift_jis', 'euc_jp']
+    valid_encodings = ['utf-8', 'utf-8-sig', 'gb2312', 'gbk', 'big5', 'big5hkscs', 'shift_jis', 'euc_jp', 'utf-16-le', 'utf-16-be']
     valid_file_types = ['txt', 'log', 'cue']
 
     def __init__(self, input_files, encoding="utf-8"):
@@ -303,12 +309,8 @@ class TranscodeTextTarget(OrganizeTarget):
             self._encoding = "utf-8"
         assert len(self._input) == 1, "CopyTarget only accept one input!"
 
-        if isinstance(self._input[0], str):
-            self._outname = PurePath(self._input[0]).name
-        elif isinstance(self._input[0], OrganizeTarget):
-            self._outname = self._input[0].output_name
-        else:
-            raise ValueError("Incorrect input type!")
+        stem, suffix = _split_name(self._input[0])
+        self._outname = stem + '.' + suffix if suffix else stem
 
     @classmethod
     def validate(cls, input_files):

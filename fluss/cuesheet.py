@@ -228,6 +228,8 @@ class Cuesheet:
         cur_tracks = defaultdict(CuesheetTrack)
         cur_idx = None
         for line in content.splitlines():
+            if not line.rstrip():
+                continue
             if line[:3] == "   ": # 3-4 spaces prefix
                 field, value = line.strip().split(' ', 1)
                 field = field.upper()
@@ -261,6 +263,9 @@ class Cuesheet:
                 field, value = line.strip().split(' ', 1)
                 field = field.upper()
                 if field == "REM":
+                    rem_split = value.split(' ', 1)
+                    if len(rem_split) < 2:
+                        continue
                     rem, rem_value = value.split(' ', 1)
                     cue.rems[rem] = rem_value.strip().strip('"')
                 elif field == "TITLE":

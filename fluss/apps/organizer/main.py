@@ -108,8 +108,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if not self._meta:
             return ""
 
-        if self._meta.date:
-            date = date_parse(self._meta.date)
+        datestr = self.txt_date.text() or self.txt_date.placeholderText()
+        if datestr:
+            date = date_parse(datestr)
             yymmdd = date.strftime("%y%m%d")
         else:
             yymmdd = ""
@@ -123,8 +124,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             event=self.txt_event.text(),
             collaboration="", # TODO: add collaboration option?
         )
-        name = global_config.organizer.output_format[self.cbox_output_type.currentText()].format(**name_args)
-        return name.replace("()", "").replace("[]", "").replace("[(", "(").replace(")]", ")").strip()
+        fmt: str = global_config.organizer.output_format[self.cbox_output_type.currentText()]
+        name = fmt.format(**name_args)
+
+        # simplify and escape
+        name = name.replace("()", "").replace("[]", "")
+        while "[(" in name:
+            name = name.replace("[(", "(", 1).replace(")]", ")", 1)
+        name = name.replace(":", "：").replace("/", "／") # escape characters
+        return name.strip().rstrip('.')  # directory with trailing dot is not supported by windows
 
     def listInputViewLeave(self, event):
         self._shared_states.hovered = None
@@ -266,7 +274,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def browseOutput(self):
         dlg = QFileDialog()
         dlg.setFileMode(QFileDialog.Directory)
-            
+        if self.txt_output_path and Path(self.txt_output_path.text()).exists():
+            dlg.setDirectory(self.txt_output_path.text())
+
         if dlg.exec_():
             self.txt_output_path.setText(dlg.selectedFiles()[0])
 
@@ -533,8 +543,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # flush folder meta
         self.flushFolderMeta()
         for folder, fmeta in self._meta.folders.items():
-            fmeta.tool = self._placeholders[folder].tool
-            fmeta.partnumber = self._placeholders[folder].partnumber
+            fmeta.tool = fmeta.tool or self._placeholders[folder].tool
+            fmeta.partnumber = fmeta.partnumber or self._placeholders[folder].partnumber
 
         # flush 
         self._meta.title = self.txt_title.text() or self.txt_title.placeholderText()
@@ -555,6 +565,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     async def executeTargets(self):
         self._executing = True
 
+        files_to_remove = []
         try:
             # sort targets
             order = topological_sort(self._network)
@@ -579,7 +590,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # execute targets
             output_path = Path(self.txt_output_path.text(), self.formattedOutputName)
             output_path.mkdir(exist_ok=True, parents=True)
-            files_to_remove = []
             for i, target in enumerate(order):
                 self._status_owner = target
                 self.statusbar.showMessage("(%d/%d) Executing: %s" % (i, len(order), str(target)))
@@ -602,12 +612,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             with Path(output_path, "meta.yaml").open("w", encoding="utf-8-sig") as fout:
                 yaml.dump(meta_dict, fout, encoding="utf-8", allow_unicode=True)
 
-            # clean up
-            for f in files_to_remove:
-                f.unlink()
             self.statusbar.showMessage("Organizing done successfully!")
-            self._status_owner = None
-            self._executing = False
 
         except Exception as e:
             import traceback
@@ -617,8 +622,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             msgbox = QMessageBox(self)
             msgbox.setWindowTitle("Execution failed")
             msgbox.setIcon(QMessageBox.Critical)
-            msgbox.setText("Reason: ", str(e))
+            msgbox.setText("Reason: " + str(e))
             msgbox.exec_()
+
+            self.statusbar.showMessage("Organizing failed!")
+
+        finally:
+            # clean up
+            for f in files_to_remove:
+                f.unlink()
+            self._status_owner = None
+            self._executing = False
 
 def register_context_menu(uninstall: bool = False):
     import distutils.sysconfig, winreg

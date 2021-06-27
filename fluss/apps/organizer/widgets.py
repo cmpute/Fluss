@@ -277,6 +277,12 @@ class TrackTableModel(QAbstractTableModel):
             # self._columns_editable.add(self.DURATION)
             # self._columns_editable.add(self.PREGAP)
 
+        if meta.cuesheet:
+            self._sorted_cue_files = list(meta.cuesheet.files.keys())
+            self._sorted_cue_files.sort(key=MergeTracksTarget._track_key)
+        else:
+            self._sorted_cue_files = None
+
         # logging order change
         self._track_order = list(range(max(len(track_length or []), len(self._meta.tracks))))
         self._track_length = track_length
@@ -320,6 +326,9 @@ class TrackTableModel(QAbstractTableModel):
                                 l = CuesheetTrack.duration(tracks[i+1], tracks[i+2]) / 75
                             else:
                                 l = self._track_length[0] - tracks[i+1].index01 / 75
+                        elif len(self._meta.cuesheet.files) == len(self._track_length):
+                            index01 = self._meta.cuesheet.files[self._sorted_cue_files[i]][i+1].index01
+                            l = self._track_length[i] - index01 / 75
                         else:
                             raise NotImplementedError("Need to align cuesheet file name with input name")
                     else:
@@ -334,6 +343,8 @@ class TrackTableModel(QAbstractTableModel):
                                 l = CuesheetTrack.gap(tracks[i+1], tracks[i]) / 75
                             else:
                                 l = CuesheetTrack.gap(tracks[i+1]) / 75
+                        elif len(self._meta.cuesheet.files) == len(self._track_length):
+                            l = CuesheetTrack.gap(self._meta.cuesheet.files[self._sorted_cue_files[i]][i+1])
                         else:
                             raise NotImplementedError("Need to align cuesheet file name with input name")
                     else:
@@ -782,6 +793,12 @@ def editTranscodeTrackTarget(self: TranscodeTrackTarget, input_root: Path = None
 def editTranscodeTextTarget(self: TranscodeTextTarget, input_root: Path = None, output_root: Path = None):
     assert isinstance(self._input[0], str), "Only support reading from file by now!"
 
+    def safe_decode(bytes, encoding):
+        if b"\x00" in bytes and encoding not in ['utf-16-le', 'utf-16-be']:
+            return "<This text is 16bits per character>"
+        else:
+            return content.decode(encoding=encoding, errors="replace")
+
     dialog = QDialog()
     dialog.setWindowIcon(_get_icon())
     layout = Ui_TranscodeTextTargetDialog()
@@ -789,11 +806,11 @@ def editTranscodeTextTarget(self: TranscodeTextTarget, input_root: Path = None, 
     layout.retranslateUi(dialog)
     layout.txt_outname.setText(self._outname)
     content = Path(input_root, self._input[0]).read_bytes()
-    layout.txt_content.setPlainText(content.decode(encoding=self._encoding, errors="replace"))
+    layout.txt_content.setPlainText(safe_decode(content, self._encoding))
 
     layout.cbox_encoding.addItems(self.valid_encodings)
     layout.cbox_encoding.setCurrentText(self._encoding)
-    layout.cbox_encoding.currentTextChanged.connect(lambda text: layout.txt_content.setPlainText(content.decode(encoding=text, errors="replace")))
+    layout.cbox_encoding.currentTextChanged.connect(lambda text: layout.txt_content.setPlainText(safe_decode(content, text)))
     if dialog.exec_():
         self._outname = layout.txt_outname.text()
         self._encoding = layout.cbox_encoding.currentText()
@@ -882,5 +899,12 @@ async def editTarget(target: OrganizeTarget, input_root: Path = None, output_roo
             pass # nothing to edit
         else:
             raise ValueError("Invalid target type for editing!")
-    except:
-        traceback.print_exc()
+    except Exception as e:
+        stack = traceback.format_exc()
+        _logger.error("Edit target failed. Full stack:\n" + stack)
+
+        msgbox = QMessageBox()
+        msgbox.setWindowTitle("Execution failed")
+        msgbox.setIcon(QMessageBox.Critical)
+        msgbox.setText("Reason: " + str(e))
+        msgbox.exec_()

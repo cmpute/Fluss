@@ -5,12 +5,12 @@ import yaml
 global_config = addict.Dict()
 
 # path to encoders and decoders
-global_config.path.wavpack = r"D:\Github\fluss\codecs\wavpack.exe"
-global_config.path.wvunpack = r"D:\Github\fluss\codecs\wvunpack.exe"
-global_config.path.flac = r"D:\Github\fluss\codecs\flac.exe"
-global_config.path.mac = r"D:\Github\fluss\codecs\mac.exe"
-global_config.path.tta = r"D:\Github\fluss\codecs\tta_sse4.exe"
-global_config.path.arcue = r"C:\Program Files (x86)\CUETools\CUETools_2.1.6\ArCueDotNet.exe"
+global_config.path.wavpack = ""
+global_config.path.wvunpack = ""
+global_config.path.flac = ""
+global_config.path.mac = ""
+global_config.path.tta = ""
+global_config.path.arcue = ""
 
 # encoder preset configs
 global_config.audio_codecs.wavpack.type = "wavpack"
@@ -18,7 +18,7 @@ global_config.audio_codecs.wavpack.encode = ["-m"]
 global_config.audio_codecs.wavpack_hybrid.type = "wavpack"
 global_config.audio_codecs.wavpack_hybrid.encode = ["-m", "-b192", "-c"]
 global_config.audio_codecs.wavpack_hybrid_high.type = "wavpack"
-global_config.audio_codecs.wavpack_hybrid_high.encode = ["-m", "-h", "-b192", "-c", "-x"]
+global_config.audio_codecs.wavpack_hybrid_high.encode = ["-m", "-hx", "-b192", "-c"]
 global_config.audio_codecs.flac.type = "flac"
 global_config.audio_codecs.flac.encode = []
 global_config.image_codecs.png.type = "png"
@@ -37,7 +37,7 @@ global_config.organizer.output_codec.audio = "wavpack_hybrid_high"
 global_config.organizer.output_codec.text = "utf-8-sig"
 
 # some other options
-global_config.organizer.default_output_dir = r"D:/Temp/organized"
+global_config.organizer.default_output_dir = r""
 global_config.organizer.artist_splitter = r",\s+|;\s+"  # regex expression for splitting artist
 global_config.organizer.keyword_splitter = r';| - |\[|\]|\(|\)'  # regex expression for splitting keyword
 
