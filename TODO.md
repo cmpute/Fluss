@@ -1,4 +1,4 @@
 - [ ] support DSD stream load and save
 - [ ] test HiRes support with http://www.2l.no/hires/
-- [ ] Add "open directory with organizer" to right click menu
 - [ ] Support graph parallel execution (need to display progress in a better way)
+- [ ] Add cancel button

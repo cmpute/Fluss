@@ -1,4 +1,3 @@
-from math import exp
 from pathlib import Path, PurePath
 from typing import Callable, List, Union
 from io import BytesIO
@@ -66,11 +65,8 @@ class OrganizeTarget:
         output_root is used when this target is not marked as temporary
         Should return the path to result file
         '''
-        try:
-            data = await self.apply_stream(input_root, output_root)
-            Path(output_root, self.output_name).write_bytes(data.getvalue())
-        except Exception as e:
-            traceback.print_exc()
+        data = await self.apply_stream(input_root, output_root)
+        Path(output_root, self.output_name).write_bytes(data.getvalue())
 
 
 def _split_name(target: Union[str, OrganizeTarget]):
@@ -368,6 +364,14 @@ class TranscodePictureTarget(OrganizeTarget):
             return False
         return True
 
+    def convert_if_necessary(self, im, target_fmt):
+        # remove transparency if necessary
+        assert target_fmt
+        if im.mode in {"RGBA", "P"} and target_fmt == "jpeg":
+            return im.convert("RGB")
+        else:
+            return im
+
     def __str__(self):
         return "Transcoding picture to %s" % self.output_name
 
@@ -380,6 +384,8 @@ class TranscodePictureTarget(OrganizeTarget):
         buf = BytesIO()
         codec = dict(global_config.image_codecs[self._codec])
         format = codec.pop('type')
+
+        im = self.convert_if_necessary(im, format)
         im.save(buf, format=format, **codec)
         buf.seek(0)
         return buf
@@ -413,6 +419,8 @@ class CropPictureTarget(TranscodePictureTarget):
         buf = BytesIO()
         codec = dict(global_config.image_codecs[self._codec])
         format = codec.pop('type')
+
+        im = self.convert_if_necessary(im, format)
         im.save(buf, format=format, **codec)
         buf.seek(0)
         return buf

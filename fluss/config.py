@@ -9,6 +9,7 @@ global_config.path.wavpack = ""
 global_config.path.wvunpack = ""
 global_config.path.flac = ""
 global_config.path.mac = ""
+global_config.path.takc = ""
 global_config.path.tta = ""
 global_config.path.arcue = ""
 
@@ -55,7 +56,7 @@ else:
 # setting up logging
 import logging
 logging.basicConfig(level=logging.DEBUG,
+                    handlers=[logging.FileHandler(filename=Path("~/.fluss.log").expanduser(), 
+                                                  encoding='utf-8', mode='a+')],
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                    datefmt='%m-%d %H:%M:%S',
-                    filename=Path("~/.fluss.log").expanduser(),
-                    filemode='w')
+                    datefmt='%m-%d %H:%M:%S')

@@ -8,6 +8,8 @@ from typing import Dict, Optional, Union
 import chardet
 from chardet.enums import LanguageFilter
 from mutagen import FileType, Tags, flac
+from mutagen.apev2 import APETextValue, APEv2File
+from mutagen.id3 import ID3FileType
 
 
 def _parse_index_point(timestr: str) -> int:
@@ -192,18 +194,20 @@ class Cuesheet:
         return cue
 
     @classmethod
-    def from_mutagen(cls, tag: Union[flac.FLAC, Tags, FileType]) -> "Cuesheet":
+    def from_mutagen(cls, tag: Union[flac.FLAC, FileType]) -> "Cuesheet":
         if isinstance(tag, flac.FLAC):
             if tag.cuesheet:
                 return cls.from_flac(tag.cuesheet)
             else:
                 tags_upper = {k.upper(): v[0] for k, v in tag.tags.items()}
-        elif isinstance(tag, Tags):
-            tags_upper = {k.upper(): v for k, v in tag.items()}
-        elif isinstance(tag, FileType):
+        elif isinstance(tag, APEv2File):
             if not tag.tags:
                 return None
-            tags_upper = {k.upper(): v for k, v in tag.tags.items()}
+            tags_upper = {k.upper(): v.value for k, v in tag.tags.items() if isinstance(v, APETextValue)}
+        elif isinstance(tag, ID3FileType):
+            if not tag.tags:
+                return None
+            raise NotImplementedError()
         else:
             raise ValueError("Unrecognized mutagen input: " + str(type(tag)))
             
@@ -285,7 +289,7 @@ class Cuesheet:
                     if file_type.strip() != "WAVE":
                         raise SyntaxError("Unsupported media type: %s!" % file_type)
                 else:
-                    raise SyntaxError("Unrecognized line: " + line)
+                    raise SyntaxError("Unrecognized line: " + repr(line))
 
         if cur_file is not None:
             cue.files[cur_file] = dict(cur_tracks)

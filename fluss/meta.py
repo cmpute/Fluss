@@ -388,7 +388,7 @@ class DiscMeta:
         add_if_exist(self.genre, 'GENRE')
         add_if_exist(self.date, 'DATE')
         if self.artists:
-            flac_meta.tags['ALBUMARTIST'] = list(self.artists)
+            flac_meta.tags['ALBUM ARTIST'] = list(self.artists)
         if self.discnumber is not None:
             flac_meta.tags['DISCNUMBER'] = str(self.discnumber)
 
@@ -429,7 +429,7 @@ class DiscMeta:
             ape_meta.add_tags()
 
         add_if_exist(self.title, 'ALBUM')
-        add_if_exist(self.full_artist, 'ALBUMARTIST')
+        add_if_exist(self.full_artist, 'ALBUM ARTIST')
         if self.cover:
             add_if_exist(b'fluss.jpg\x00' + self.cover, 'Cover Art (Front)')
         add_if_exist(self.genre, 'GENRE')

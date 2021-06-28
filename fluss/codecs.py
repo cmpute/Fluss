@@ -22,6 +22,7 @@ import mutagen.wave
 import mutagen.wavpack
 import mutagen.monkeysaudio
 import mutagen.trueaudio
+import mutagen.tak
 
 from mutagen import id3, apev2
 
@@ -68,13 +69,14 @@ class AudioCodec:
     async def _report_encode_progress(self,
             stream: asyncio.StreamReader,
             pattern: str,
-            convert: Callable[[str], float],
+            convert: Union[Callable[[str], float], float],
             callback: Callable[[float], None],
             linesep: str = b'\r\b') -> None:
         '''
         Utility function for codecs to match progress string from process stream
         '''
         pattern = re.compile(pattern)
+        cumulate = 0.0
         finished = False
         while not finished:
             try:
@@ -87,7 +89,11 @@ class AudioCodec:
 
             match = pattern.search(line)
             if match:
-                callback(convert(match[0]))
+                if isinstance(convert, float):
+                    cumulate += convert
+                    callback(cumulate)
+                else:
+                    callback(convert(match[0]))
 
     def encode(self, fout: str, wavein: bytes) -> None:
         raise NotImplementedError("Abstract function!")
@@ -230,6 +236,8 @@ class wavpack(AudioCodec):
         proc.communicate(wavein)
 
     async def encode_async(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, None]:
+        _logger.info("Encoding as wavpack to %s", fout)
+
         if progress_callback is None:
             args = [C.path.wavpack, '-yq'] + self.encode_args + ["-", _resolve_pathstr(fout)]
             stderr = None
@@ -310,6 +318,8 @@ class monkeysaudio(AudioCodec):
             proc.wait()
 
     async def encode_async(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, None]:
+        _logger.info("Encoding as ape to %s", fout)
+
         with TemporaryDirectory() as tmp:
             tmp_file = Path(tmp, 'tmp.wav')
             tmp_file.write_bytes(wavein)
@@ -380,6 +390,8 @@ class trueaudio(AudioCodec):
         proc.communicate(wavein)
 
     async def encode_async(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, None]:
+        _logger.info("Encoding as tta to %s", fout)
+
         args = [C.path.tta, "-e"] + self.encode_args + ["-", _resolve_pathstr(fout)]
         stderr = subprocess.DEVNULL if progress_callback is None else subprocess.PIPE
         proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stdin=subprocess.PIPE, stderr=stderr)
@@ -432,13 +444,81 @@ class trueaudio(AudioCodec):
     def mutagen(cls, fin: str) -> id3.ID3FileType:
         return mutagen.trueaudio.TrueAudio(fin)
 
+class tak(AudioCodec):
+    suffix = "tak"
+
+    def __init__(self, encode_args=None):
+        super().__init__(encode_args)
+        assert Path(C.path.takc).exists()
+
+    def encode(self, fout: str, wavein: bytes) -> None:
+        proc = subprocess.Popen([C.path.takc, "-e", "-silent", "-overwrite"] + self.encode_args + ["-", _resolve_pathstr(fout)],
+            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL)
+        proc.communicate(wavein)
+
+    async def encode_async(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, None]:
+        _logger.info("Encoding as tak to %s", fout)
+
+        args = [C.path.takc, "-e", "-overwrite"] + self.encode_args + ["-", _resolve_pathstr(fout)]
+        stdout = subprocess.DEVNULL if progress_callback is None else subprocess.PIPE
+        proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stdin=subprocess.PIPE, stdout=stdout)
+
+        if progress_callback is not None:
+            ptask = self._report_encode_progress(proc.stdout,
+                                                 pattern=rb'[^1-9]\.|^\.',
+                                                 convert=0.1,
+                                                 callback=progress_callback,
+                                                 linesep=b'.')
+
+        proc.stdin.write(wavein)
+        proc.stdin.close()
+
+        if progress_callback is not None:
+            await asyncio.gather(ptask, proc.wait())
+        else:
+            await proc.wait()
+
+    def decode(self, fin: str) -> wave.Wave_read:
+        proc = subprocess.Popen([C.path.takc, "-d", "-silent", "-overwrite", _resolve_pathstr(fin), '-'],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        return wave.open(proc.stdout, "rb")
+
+    async def decode_async(self, fin: str, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, wave.Wave_read]:
+        _logger.info("Decoding %s as tak", fin)
+        ftmp = _get_temp_file("decode_", ".wav")
+
+        args = [C.path.takc, "-d", "-overwrite", _resolve_pathstr(fin), str(ftmp)]
+        stdout = subprocess.DEVNULL if progress_callback is None else subprocess.PIPE
+        proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stdout=stdout)
+
+        if progress_callback is not None:
+            ptask = self._report_encode_progress(proc.stdout,
+                                                 pattern=rb'[^1-9]\.|^\.',
+                                                 convert=0.1,
+                                                 callback=progress_callback,
+                                                 linesep=b'.')
+
+        if progress_callback is not None:
+            await asyncio.gather(ptask, proc.wait())
+        else:
+            await proc.wait()
+
+        buf = ftmp.read_bytes()
+        ftmp.unlink()
+        _logger.info("Decoding %s done")
+        return wave.open(io.BytesIO(buf), 'rb')
+
+    @classmethod
+    def mutagen(cls, fin: str) -> apev2.APEv2File:
+        return mutagen.tak.TAK(fin)
 
 codec_from_name = {
     'wavpack': wavpack,
     'flac': flac,
     'monkeysaudio': monkeysaudio,
     'trueaudio': trueaudio,
-    'wave': wav
+    'wave': wav,
+    'tak': tak,
 }
 
 def codec_from_filename(filename: Union[Path, str]) -> Type[AudioCodec]:

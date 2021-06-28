@@ -13,6 +13,7 @@ from fluss.config import global_config
 from fluss.cuesheet import CuesheetTrack
 from fluss.meta import Cuesheet, DiscMeta, TrackMeta
 from networkx import DiGraph
+import unicodedata
 from PySide6.QtCore import (QAbstractListModel, QAbstractTableModel,
                             QItemSelection, QItemSelectionModel, QMimeData,
                             QModelIndex, QRect, Qt, Signal)
@@ -797,7 +798,9 @@ def editTranscodeTextTarget(self: TranscodeTextTarget, input_root: Path = None, 
         if b"\x00" in bytes and encoding not in ['utf-16-le', 'utf-16-be']:
             return "<This text is 16bits per character>"
         else:
-            return content.decode(encoding=encoding, errors="replace")
+            content = bytes.decode(encoding=encoding, errors="replace")
+            non_printable = {"Cf","Cs","Co","Cn"}
+            return ''.join(repr(c)[1:-1] if unicodedata.category(c) in non_printable else c for c in content)
 
     dialog = QDialog()
     dialog.setWindowIcon(_get_icon())
