@@ -11,6 +11,7 @@ global_config.path.flac = ""
 global_config.path.mac = ""
 global_config.path.takc = ""
 global_config.path.tta = ""
+global_config.path.refalac = ""
 global_config.path.arcue = ""
 
 # encoder preset configs
@@ -29,7 +30,7 @@ global_config.image_codecs.jpg.quality = 80
 # define possible output formats
 global_config.organizer.output_format.indie = "[{artist}][{partnumber}][{yymmdd}({event})][{collaboration}] {title}"
 global_config.organizer.output_format.commercial = "[{artist}][{yymmdd}({event})][{partnumber}] {title}"
-global_config.organizer.output_format.acg = "[{yymmdd}({event})][{artist}][{partnumber}] {title}"
+global_config.organizer.output_format.acg = "[{yymmdd}({event})][{artist}] {title}"
 global_config.organizer.output_format.indie_collection = "[{partnumber}][{yymmdd}({event})] {title}"
 
 # define default output codec for various contents

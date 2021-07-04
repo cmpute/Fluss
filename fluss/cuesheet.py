@@ -10,7 +10,9 @@ from chardet.enums import LanguageFilter
 from mutagen import FileType, Tags, flac
 from mutagen.apev2 import APETextValue, APEv2File
 from mutagen.id3 import ID3FileType
+from mutagen.mp4 import MP4
 
+from fluss.codecs import APETagFiles, ID3TagFiles
 
 def _parse_index_point(timestr: str) -> int:
     timestr = timestr.strip()
@@ -200,14 +202,16 @@ class Cuesheet:
                 return cls.from_flac(tag.cuesheet)
             else:
                 tags_upper = {k.upper(): v[0] for k, v in tag.tags.items()}
-        elif isinstance(tag, APEv2File):
+        elif isinstance(tag, APETagFiles):
             if not tag.tags:
                 return None
             tags_upper = {k.upper(): v.value for k, v in tag.tags.items() if isinstance(v, APETextValue)}
-        elif isinstance(tag, ID3FileType):
+        elif isinstance(tag, ID3TagFiles):
             if not tag.tags:
                 return None
             raise NotImplementedError()
+        elif isinstance(tag, MP4):
+            return None  # it seems that MP4 doesn't support embedded cuesheet
         else:
             raise ValueError("Unrecognized mutagen input: " + str(type(tag)))
             

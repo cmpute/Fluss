@@ -77,6 +77,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.list_input_files.itemDoubleClicked.connect(self.previewInput)
         self.list_input_files.itemPressed.connect(self.updateSelectedInput)
         self.list_input_files.itemEntered.connect(self.updateHighlightInput)
+        self.list_input_files.enterEvent = self.listInputViewEnter
         self.list_input_files.leaveEvent = self.listInputViewLeave
         self.list_input_files.customContextMenuRequested.connect(self.inputContextMenu)
         self.panel_folder_meta.setVisible(False)
@@ -134,6 +135,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         name = name.replace(":", "：").replace("/", "／") # escape characters
         return name.strip().rstrip('.')  # directory with trailing dot is not supported by windows
 
+    def listInputViewEnter(self, event):
+        if not self._enable_cross_selection and self.currentOutputListView:
+            self.currentOutputListView.clearSelection()
+
     def listInputViewLeave(self, event):
         self._shared_states.hovered = None
 
@@ -157,6 +162,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._shared_states.hovered = self.currentOutputList[index.row()]
         self.refreshInputBgcolor()
         self.refreshOutputBgcolor()
+        if not self._enable_cross_selection:
+            self.list_input_files.clearSelection()
 
     def updateSelectedFolder(self, index: int):
         if self.tab_folders.count() == 0: # happens when reset

@@ -23,6 +23,7 @@ import mutagen.wavpack
 import mutagen.monkeysaudio
 import mutagen.trueaudio
 import mutagen.tak
+import mutagen.mp4
 
 from mutagen import id3, apev2
 
@@ -512,6 +513,75 @@ class tak(AudioCodec):
     def mutagen(cls, fin: str) -> apev2.APEv2File:
         return mutagen.tak.TAK(fin)
 
+class alac(AudioCodec):
+    suffix = "m4a"
+
+    def __init__(self, encode_args=None):
+        super().__init__(encode_args)
+        assert Path(C.path.refalac).exists()
+
+    def encode(self, fout: str, wavein: bytes) -> None:
+        proc = subprocess.Popen([C.path.refalac, "-s"] + self.encode_args + ["-", "-o", _resolve_pathstr(fout)],
+            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL)
+        proc.communicate(wavein)
+        return fout
+
+    async def encode_async(self, fout: str, wavein: bytes, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, None]:
+        _logger.info("Encoding as alac to %s", fout)
+
+        args = [C.path.refalac] + self.encode_args + ["-", "-o", _resolve_pathstr(fout)]
+        stderr = subprocess.DEVNULL if progress_callback is None else subprocess.PIPE
+        proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stdin=subprocess.PIPE, stderr=stderr)
+
+        if progress_callback is not None:
+            ptask = self._report_encode_progress(proc.stderr,
+                                                 pattern=rb'1?[0-9]{0,2}\.[0-9](?=%])',
+                                                 convert=lambda s: float(s) / 100,
+                                                 callback=progress_callback,
+                                                 linesep=b'\r')
+
+        proc.stdin.write(wavein)
+        proc.stdin.close()
+
+        if progress_callback is not None:
+            await asyncio.gather(ptask, proc.wait())
+        else:
+            await proc.wait()
+
+    def decode(self, fin: str) -> wave.Wave_read:
+        proc = subprocess.Popen([C.path.refalac, "-s", "-D", _resolve_pathstr(fin), "-o", "-"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        return wave.open(proc.stdout, "rb")
+
+    async def decode_async(self, fin: str, progress_callback: Callable[[float], None] = None) -> Coroutine[Any, Any, wave.Wave_read]:
+        _logger.info("Decoding %s as alac", fin)
+        ftmp = _get_temp_file("decode_", ".wav")
+
+        args = [C.path.refalac, "-D", _resolve_pathstr(fin), "-o", str(ftmp)]
+        stderr = subprocess.DEVNULL if progress_callback is None else subprocess.PIPE
+        proc = await asyncio.create_subprocess_shell(joint_command_args(*args), stderr=stderr)
+
+        if progress_callback is not None:
+            ptask = self._report_encode_progress(proc.stderr,
+                                                 pattern=rb'1?[0-9]{0,2}\.[0-9](?=%])',
+                                                 convert=lambda s: float(s) / 100,
+                                                 callback=progress_callback,
+                                                 linesep=b'\r')
+
+        if progress_callback is not None:
+            await asyncio.gather(ptask, proc.wait())
+        else:
+            await proc.wait()
+
+        buf = ftmp.read_bytes()
+        ftmp.unlink()
+        _logger.info("Decoding %s done")
+        return wave.open(io.BytesIO(buf), 'rb')
+
+    @classmethod
+    def mutagen(cls, fin: str) -> mutagen.mp4.MP4:
+        return mutagen.mp4.MP4(fin)
+
 codec_from_name = {
     'wavpack': wavpack,
     'flac': flac,
@@ -519,6 +589,7 @@ codec_from_name = {
     'trueaudio': trueaudio,
     'wave': wav,
     'tak': tak,
+    'm4a': alac
 }
 
 def codec_from_filename(filename: Union[Path, str]) -> Type[AudioCodec]:

@@ -1,11 +1,13 @@
 from copy import deepcopy
 from io import BytesIO
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Tuple
 
 import mutagen
+from mutagen import mp4
 from mutagen.apev2 import BINARY, TEXT, APEv2File, APEValue
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import ID3, ID3FileType, PictureType
+from mutagen.mp4 import MP4, MP4Cover
 from PIL import Image
 
 from fluss import cuesheet
@@ -47,12 +49,15 @@ class TrackMeta:
 
     @classmethod
     def from_flac(cls, flac_meta: FLAC) -> "TrackMeta":
+        if not flac_meta.tags:
+            return cls()
+
         cur_track = TrackMeta()
         cur_updated = False
         if 'TITLE' in flac_meta.tags:
             cur_track.title = flac_meta.tags['TITLE'][0]
             cur_updated = True
-        if 'ARTIST' in flac_meta:
+        if 'ARTIST' in flac_meta.tags:
             cur_track.artists.update(a for a in flac_meta.tags.get('ARTIST') if a)
             cur_updated = True
 
@@ -88,6 +93,22 @@ class TrackMeta:
         return cur_track if cur_updated else None
 
     @classmethod
+    def from_mp4(cls, mp4_meta: MP4) -> "TrackMeta":
+        if not mp4_meta.tags:
+            return cls()
+
+        cur_track = TrackMeta()
+        cur_updated = False
+        if '\xa9nam' in mp4_meta.tags:
+            cur_track.title = mp4_meta.tags['\xa9nam'][0]
+            cur_updated = True
+        if '\xa9ART' in mp4_meta.tags:
+            cur_track.artists.update(a for a in mp4_meta.tags['\xa9ART'] if a)
+            cur_updated = True
+
+        return cur_track if cur_updated else None
+
+    @classmethod
     def from_mutagen(cls, mutagen_file: mutagen.FileType) -> "TrackMeta":
         '''
         Create metadata from mutagen file
@@ -99,6 +120,8 @@ class TrackMeta:
             return cls.from_ape(mutagen_file)
         elif isinstance(mutagen_file, ID3TagFiles):
             return cls.from_id3(mutagen_file)
+        elif isinstance(mutagen_file, MP4):
+            return cls.from_mp4(mutagen_file)
         else:
             raise ValueError("Unsupported mutagen format!")
 
@@ -258,6 +281,45 @@ class DiscMeta:
         raise NotImplementedError("Parsing metadata from APE tags is not implemented!")
 
     @classmethod
+    def from_mp4(cls, mp4_meta: MP4) -> "DiscMeta":
+        '''
+        Create metadata from media with APEv2 tags
+        '''
+        if not mp4_meta.tags:
+            return cls()
+
+        meta = cls()
+
+        # parse common fields
+        if mp4_meta.tags.get("\xa9alb", None):
+            meta.title = mp4_meta.tags["\xa9alb"][0]
+        if mp4_meta.tags.get("aART", None):
+            meta.artists.update(a for a in mp4_meta.tags["aART"] if a)
+        if mp4_meta.tags.get("\xa9day", None):
+            meta.date = mp4_meta.tags["\xa9day"][0]
+
+        # parse disc numbers
+        discnum_tuple: Tuple[int, int] = mp4_meta.tags.get("disk", None)
+        if discnum_tuple:
+            meta.discnumber = discnum_tuple[0]
+
+        # parse track numbers
+        track_idx_tuple: Tuple[int, int] = mp4_meta.tags.get("trkn", None)
+        if track_idx_tuple: # This is an mp4 file for single track
+            track_idx = track_idx_tuple[0] - 1
+            reserved_idx = track_idx
+            meta._reserve_tracks(reserved_idx)
+            meta.tracks[track_idx] = TrackMeta.from_mp4(mp4_meta)
+
+        # TODO: it seems that mp4 doesn't support embedded cuesheet
+
+        # get cover
+        if mp4_meta.tags.get("covr", None):
+            meta.cover = mp4_meta["covr"]
+
+        return meta
+
+    @classmethod
     def from_id3(cls, id3_meta: ID3FileType) -> "DiscMeta":
         '''
         Create metadata from media with ID3v2 tags
@@ -323,6 +385,8 @@ class DiscMeta:
             return cls.from_ape(mutagen_file)
         elif isinstance(mutagen_file, ID3TagFiles):
             return cls.from_id3(mutagen_file)
+        elif isinstance(mutagen_file, MP4):
+            return cls.from_mp4(mutagen_file)
         else:
             raise ValueError("Unsupported mutagen format: " + str(type(mutagen_file)))
 
@@ -413,6 +477,9 @@ class DiscMeta:
 
     def to_id3(self, id3_meta: ID3) -> None:
         raise NotImplementedError("Convert metadata to FLAC is not implemented!")
+
+    def to_mp4(self, mp4_meta: MP4) -> None:
+        raise NotImplementedError("Convert metadata to MP4(M4A) is not implemented!")
 
     def to_ape(self, ape_meta: APEv2File) -> None:
         def add_if_exist(obj, tag_key):
