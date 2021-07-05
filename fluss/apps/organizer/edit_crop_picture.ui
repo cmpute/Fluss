@@ -207,6 +207,55 @@
         </spacer>
        </item>
        <item>
+        <widget class="QPushButton" name="btn_fit_height">
+         <property name="text">
+          <string>Fit height</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btn_fit_width">
+         <property name="text">
+          <string>Fit width</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btn_align_vmiddle">
+         <property name="text">
+          <string>Center vertically</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btn_align_hmiddle">
+         <property name="text">
+          <string>Center horizontally</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btn_reset_top">
+         <property name="text">
+          <string>Reset to top</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btn_reset_left">
+         <property name="text">
+          <string>Reset to left</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btn_reset_right">
+         <property name="text">
+          <string>Reset to right</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QDialogButtonBox" name="buttonBox">
          <property name="orientation">
           <enum>Qt::Horizontal</enum>

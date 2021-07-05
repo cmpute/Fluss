@@ -147,7 +147,7 @@ class TranscodeTrackTarget(OrganizeTarget):
     @property
     def output_name(self):
         fname = self._outstem
-        codec_cls = codec_from_name[global_config.audio_codecs[self._codec].type]
+        codec_cls = codec_from_name[global_config.audio_codecs[self._codec].type.lower()]
         return fname + "." + codec_cls.suffix
 
     def __str__(self):
@@ -252,7 +252,7 @@ class MergeTracksTarget(OrganizeTarget):
     @property
     def output_name(self):
         fname = self._outstem or self._default_output_name()
-        codec_cls = codec_from_name[global_config.audio_codecs[self._codec].type]
+        codec_cls = codec_from_name[global_config.audio_codecs[self._codec].type.lower()]
         return fname + "." + codec_cls.suffix
 
     def __str__(self):

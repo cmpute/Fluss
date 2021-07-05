@@ -14,7 +14,7 @@ from io import BytesIO
 def _get_codec(filename: Union[str, Path], codec: str = None) -> codecs.AudioCodec:
     if codec:
         codec_conf = global_config.audio_codecs[codec]
-        codec_t = codecs.codec_from_name[codec_conf.type]
+        codec_t = codecs.codec_from_name[codec_conf.type.lower()]
         if codec_t != codecs.codec_from_filename(filename):
             raise ValueError("Inconsistent codec type with file suffix!")
         return codec_t(codec_conf.encode)

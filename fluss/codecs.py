@@ -616,7 +616,7 @@ codec_from_name = {
 
 def codec_from_filename(filename: Union[Path, str]) -> Type[AudioCodec]:
     codec_map = {('.' + c.suffix): c for c in codec_from_name.values()}
-    return codec_map[Path(filename).suffix]
+    return codec_map[Path(filename).suffix.lower()]
 
 def merge_streams(streams: List[Union[wave.Wave_read, float]], fout: io.RawIOBase) -> None:
     '''

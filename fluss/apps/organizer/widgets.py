@@ -1,5 +1,6 @@
 
 import math
+from os import read
 import re
 import traceback
 import typing
@@ -17,7 +18,7 @@ import unicodedata
 from PySide6.QtCore import (QAbstractListModel, QAbstractTableModel,
                             QItemSelection, QItemSelectionModel, QMimeData,
                             QModelIndex, QRect, Qt, Signal)
-from PySide6.QtGui import (QBrush, QColor, QDropEvent, QImage, QKeyEvent,
+from PySide6.QtGui import (QBrush, QColor, QDropEvent, QImage, QImageReader, QKeyEvent,
                            QMouseEvent, QPen, QPixmap, QResizeEvent,
                            QWheelEvent)
 from PySide6.QtWidgets import (QApplication, QDialog, QFrame,
@@ -261,6 +262,7 @@ class TrackTableModel(QAbstractTableModel):
     ARTISTS = 'A'
     DURATION = 'D'
     PREGAP = 'P'
+    POSTGAP = "O"
 
     def __init__(self, parent: QTableView, meta: DiscMeta, track_source: List[Union[str, OrganizeTarget]], track_length: List[float] = None):
         '''
@@ -277,6 +279,9 @@ class TrackTableModel(QAbstractTableModel):
             # TODO: enable editing after implementing them
             # self._columns_editable.add(self.DURATION)
             # self._columns_editable.add(self.PREGAP)
+            if len(track_source) > 1:
+                # display appended gap
+                self._columns.append(self.POSTGAP)
 
         if meta.cuesheet:
             self._sorted_cue_files = list(meta.cuesheet.files.keys())
@@ -328,8 +333,12 @@ class TrackTableModel(QAbstractTableModel):
                             else:
                                 l = self._track_length[0] - tracks[i+1].index01 / 75
                         elif len(self._meta.cuesheet.files) == len(self._track_length):
-                            index01 = self._meta.cuesheet.files[self._sorted_cue_files[i]][i+1].index01
-                            l = self._track_length[i] - index01 / 75
+                            fileitem = self._meta.cuesheet.files[self._sorted_cue_files[i]]
+                            index01 = fileitem[i+1].index01
+                            if i+2 in fileitem and fileitem[i+2].index00: # appended gap
+                                l = (fileitem[i+2].index00 - index01) / 75
+                            else:
+                                l = self._track_length[i] - index01 / 75
                         else:
                             raise NotImplementedError("Need to align cuesheet file name with input name")
                     else:
@@ -350,6 +359,17 @@ class TrackTableModel(QAbstractTableModel):
                             raise NotImplementedError("Need to align cuesheet file name with input name")
                     else:
                         l = 0
+                    return format_duration(l)
+                elif self._columns[index.column()] == self.POSTGAP:
+                    assert self._meta.cuesheet
+                    assert len(self._track_source) > 1
+
+                    l = 0 # display value
+                    if len(self._meta.cuesheet.files) == len(self._track_length):
+                        fileitem = self._meta.cuesheet.files[self._sorted_cue_files[i]]
+                        index01 = fileitem[i+1].index01
+                        if i+2 in fileitem and fileitem[i+2].index00: # postgap
+                            l = self._track_length[i] - fileitem[i+2].index00 / 75
                     return format_duration(l)
                 else:
                     return "N/A"
@@ -386,9 +406,11 @@ class TrackTableModel(QAbstractTableModel):
                 elif self._columns[section] == self.DURATION:
                     return "Duration"
                 elif self._columns[section] == self.PREGAP:
-                    return "Pregap"
+                    return "PreGap"
                 elif self._columns[section] == self.SOURCE:
                     return "Source"
+                elif self._columns[section] == self.POSTGAP:
+                    return "PostGap"
 
     def setData(self, index: QModelIndex, value: str, role: int):
         def update_field(i, col, value):
@@ -462,6 +484,7 @@ class CropImageView(QGraphicsView):
         self._box_pad_scale = 0.95 # ratio of margin between displayed crop box and widget frame
         self._box_actual_dim = 800 # px, actual output size of cropped image
         self._line_len = 20 # length of crop box center cross
+        self._default_scale_margin = 0.001 # make the fit a little bit larger to make sure fill out the final image
 
         self._click_type = None
         self._click_origin = None
@@ -470,9 +493,11 @@ class CropImageView(QGraphicsView):
         self._modifier_state = None
 
     def setup(self, image: Path, box_actual_dim=800, **initial_config: dict) -> None:
-        self._image = QImage(str(image))
+        reader = QImageReader(str(image))
+        reader.setAllocationLimit(1024) # at most 1G
+        self._image = reader.read()
         self._box_actual_dim = box_actual_dim
-        self.resetConfig()
+        self.resetToLeft()
         if initial_config:
             for k, v in initial_config.items():
                 if v is not None:
@@ -497,16 +522,7 @@ class CropImageView(QGraphicsView):
         self.scene().addItem(self._crop_box_hline)
         self.scene().addItem(self._crop_box_vline)
 
-    def resetConfig(self) -> None:
-        key_dim = min(self._image.width(), self._image.height())
-        default_s = self._box_actual_dim / key_dim
-        self._config = edict(
-            xoffset = key_dim / 2,
-            yoffset = key_dim / 2,
-            scale = default_s,
-            rotation = 0,
-            speed = 0 # power index
-        )
+    def emitAll(self) -> None:
         self.xOffsetChanged.emit(self._config.xoffset)
         self.yOffsetChanged.emit(self._config.yoffset)
         self.scaleChanged.emit(self._config.scale)
@@ -519,6 +535,59 @@ class CropImageView(QGraphicsView):
             if v is not None:
                 self._config[k] = v
         self.refreshSceneLayout()
+
+    def fitWidth(self) -> None:
+        self._config['xoffset'] = self._image.width() / 2
+        self._config['scale'] = self._box_actual_dim / self._image.width() + self._default_scale_margin
+        self.xOffsetChanged.emit(self._config.xoffset)
+        self.scaleChanged.emit(self._config.scale)
+
+    def fitHeight(self) -> None:
+        self._config['yoffset'] = self._image.height() / 2
+        self._config['scale'] = self._box_actual_dim / self._image.height() + self._default_scale_margin
+        self.yOffsetChanged.emit(self._config.yoffset)
+        self.scaleChanged.emit(self._config.scale)
+
+    def centerHorizontally(self) -> None:
+        self._config['xoffset'] = self._image.width() / 2
+        self.xOffsetChanged.emit(self._config.xoffset)
+
+    def centerVertically(self) -> None:
+        self._config['yoffset'] = self._image.height() / 2
+        self.yOffsetChanged.emit(self._config.yoffset)
+
+    def resetToLeft(self) -> None:
+        default_s = self._box_actual_dim / self._image.height()
+        self._config = edict(
+            xoffset = self._image.height() / 2,
+            yoffset = self._image.height() / 2,
+            scale = default_s + self._default_scale_margin, 
+            rotation = 0,
+            speed = 0 # power index
+        )
+        self.emitAll()
+
+    def resetToRight(self) -> None:
+        default_s = self._box_actual_dim / self._image.height()
+        self._config = edict(
+            xoffset = self._image.width() - self._image.height() / 2,
+            yoffset = self._image.height() / 2,
+            scale = default_s + self._default_scale_margin,
+            rotation = 0,
+            speed = 0 # power index
+        )
+        self.emitAll()
+
+    def resetToTop(self) -> None:
+        default_s = self._box_actual_dim / self._image.width()
+        self._config = edict(
+            xoffset = self._image.width() / 2,
+            yoffset = self._image.width() / 2,
+            scale = default_s + self._default_scale_margin,
+            rotation = 0,
+            speed = 0 # power index
+        )
+        self.emitAll()
 
     def refreshSceneLayout(self) -> None:
         r = self.size().width() / self.size().height()
@@ -574,7 +643,7 @@ class CropImageView(QGraphicsView):
         elif event.key() == Qt.Key_Control:
             self._modifier_state = "ctrl"
         elif event.key() == Qt.Key_R:
-            self.resetConfig()
+            self.resetToLeft()
         elif event.key() == Qt.Key_Z:
             self._speed_origin = self._config.speed
             self._config.speed = max(self._config.speed - 4, -10)
@@ -867,6 +936,14 @@ def editCropPictureTarget(self: CropPictureTarget, input_root: Path = None, outp
     layout.sbox_scale.valueChanged.connect(lambda value: layout.image_box.updateConfig(scale=value))
     layout.sbox_rotation.valueChanged.connect(lambda value: layout.image_box.updateConfig(rotation=value))
     layout.dial_speed.valueChanged.connect(lambda value: layout.image_box.updateConfig(speed=value))
+
+    layout.btn_align_hmiddle.clicked.connect(layout.image_box.centerHorizontally)
+    layout.btn_align_vmiddle.clicked.connect(layout.image_box.centerVertically)
+    layout.btn_fit_width.clicked.connect(layout.image_box.fitWidth)
+    layout.btn_fit_height.clicked.connect(layout.image_box.fitHeight)
+    layout.btn_reset_left.clicked.connect(layout.image_box.resetToLeft)
+    layout.btn_reset_right.clicked.connect(layout.image_box.resetToRight)
+    layout.btn_reset_top.clicked.connect(layout.image_box.resetToTop)
 
     codecs_names = [f".{_image_suffix_from_format[v.type]} ({c})" for c, v in global_config.image_codecs.items()]
     codecs_list = list(global_config.image_codecs.keys())
