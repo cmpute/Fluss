@@ -298,15 +298,15 @@ class MergeTracksTarget(OrganizeTarget):
 class TranscodeTextTarget(OrganizeTarget):
     ''' Support text encoding fixing '''
     description = "Transcode Text"
-    valid_encodings = ['utf-8', 'utf-8-sig', 'gb2312', 'gbk', 'big5', 'big5hkscs', 'shift_jis', 'euc_jp', 'utf-16-le', 'utf-16-be']
+    valid_encodings = ['utf-8-sig', 'gbk', 'big5', 'shift_jis', 'utf-16-le', 'utf-16-be', 'big5hkscs', 'euc_jp']
     valid_file_types = ['txt', 'log', 'cue']
 
-    def __init__(self, input_files, encoding="utf-8"):
+    def __init__(self, input_files, encoding="utf-8-sig"):
         super().__init__(input_files)
         if encoding in self.valid_encodings:
             self._encoding = encoding
         else:
-            self._encoding = "utf-8"
+            self._encoding = "utf-8-sig"
         assert len(self._input) == 1, "CopyTarget only accept one input!"
 
         stem, suffix = _split_name(self._input[0])
@@ -411,22 +411,26 @@ class CropPictureTarget(TranscodePictureTarget):
     def initialized(self):
         return self._scale is not None
 
+
     async def apply_stream(self, input_root, output_root):
-        im = Image.open(Path(input_root, self._input[0]))
-        im = im.rotate(-self._rotation, center=(self._centerx, self._centery), fillcolor=(255,255,255), resample=Image.BICUBIC)
-        scaled_size = self._output_size / self._scale
-        im = im.transform((int(scaled_size), int(scaled_size)), Image.EXTENT, [
-            self._centerx - scaled_size/2, self._centery - scaled_size/2,
-            self._centerx + scaled_size/2, self._centery + scaled_size/2], fillcolor=(255,255,255), resample=Image.BICUBIC)
-        im = im.resize((self._output_size, self._output_size), resample=Image.BICUBIC)
-
         buf = BytesIO()
-        codec = dict(global_config.image_codecs[self._codec])
-        format = codec.pop('type')
+        def task():
+            im = Image.open(Path(input_root, self._input[0]))
+            im = im.rotate(-self._rotation, center=(self._centerx, self._centery), fillcolor=(255,255,255), resample=Image.BICUBIC)
+            scaled_size = self._output_size / self._scale
+            im = im.transform((int(scaled_size), int(scaled_size)), Image.EXTENT, [
+                self._centerx - scaled_size/2, self._centery - scaled_size/2,
+                self._centerx + scaled_size/2, self._centery + scaled_size/2], fillcolor=(255,255,255), resample=Image.BICUBIC)
+            im = im.resize((self._output_size, self._output_size), resample=Image.BICUBIC)
 
-        im = self.convert_if_necessary(im, format)
-        im.save(buf, format=format, **codec)
-        buf.seek(0)
+            codec = dict(global_config.image_codecs[self._codec])
+            format = codec.pop('type')
+
+            im = self.convert_if_necessary(im, format)
+            im.save(buf, format=format, **codec)
+            buf.seek(0)
+
+        await asyncio.get_running_loop().run_in_executor(None, task)
         return buf
 
     def __str__(self):

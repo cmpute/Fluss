@@ -434,8 +434,9 @@ class DiscMeta:
             for track_idx, track in file_tracks.items():
                 if track_idx <= len(self.tracks):
                     cur_track = self.tracks[track_idx-1]
-                    assert_field(track.title, cur_track.title, "track %d title" % track_idx)
-                    assert_field(track.performer, cur_track.full_artist, "track %d artist" % track_idx)
+                    if cur_track:
+                        assert_field(track.title, cur_track.title, "track %d title" % track_idx)
+                        assert_field(track.performer, cur_track.full_artist, "track %d artist" % track_idx)
 
         self._cuesheet = value
 

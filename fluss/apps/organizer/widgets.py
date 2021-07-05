@@ -311,12 +311,14 @@ class TrackTableModel(QAbstractTableModel):
                     return ""
             else:
                 i = index.row()-1
-                if self._meta.tracks[i] is None:
-                    return "<None>"
 
                 if self._columns[index.column()] == self.TITLE:
+                    if self._meta.tracks[i] is None:
+                        return "<None>"
                     return self._meta.tracks[i].title
                 elif self._columns[index.column()] == self.ARTISTS:
+                    if self._meta.tracks[i] is None:
+                        return "<None>"
                     return self._meta.tracks[i].full_artist
                 elif self._columns[index.column()] == self.SOURCE:
                     actual_idx = self._track_order[i]
@@ -414,6 +416,8 @@ class TrackTableModel(QAbstractTableModel):
 
     def setData(self, index: QModelIndex, value: str, role: int):
         def update_field(i, col, value):
+            if self._meta.tracks[i] is None:
+                self._meta.tracks[i] = TrackMeta()
             if self._columns[col] == self.TITLE:
                 self._meta.tracks[i].title = value
             elif self._columns[col] == self.ARTISTS:
@@ -497,7 +501,7 @@ class CropImageView(QGraphicsView):
         reader.setAllocationLimit(1024) # at most 1G
         self._image = reader.read()
         self._box_actual_dim = box_actual_dim
-        self.resetToLeft()
+        self.resetToRight()
         if initial_config:
             for k, v in initial_config.items():
                 if v is not None:
@@ -643,7 +647,7 @@ class CropImageView(QGraphicsView):
         elif event.key() == Qt.Key_Control:
             self._modifier_state = "ctrl"
         elif event.key() == Qt.Key_R:
-            self.resetToLeft()
+            self.resetToRight()
         elif event.key() == Qt.Key_Z:
             self._speed_origin = self._config.speed
             self._config.speed = max(self._config.speed - 4, -10)
@@ -878,6 +882,8 @@ def editTranscodeTextTarget(self: TranscodeTextTarget, input_root: Path = None, 
     layout.retranslateUi(dialog)
     layout.txt_outname.setText(self._outname)
     content = Path(input_root, self._input[0]).read_bytes()
+    if b"\x00" in content and self._encoding not in ['utf-16-le', 'utf-16-be']:
+        self._encoding = 'utf-16-le'
     layout.txt_content.setPlainText(safe_decode(content, self._encoding))
 
     layout.cbox_encoding.addItems(self.valid_encodings)
