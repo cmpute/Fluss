@@ -83,6 +83,7 @@ _default_cuesheet_file = "CDImage.wav"
 class Cuesheet:
     rems: Dict[str, str]
     title: str
+    songwriter: str
     performer: str
     catalog: str
     files: Dict[str, Dict[int, CuesheetTrack]]
@@ -95,6 +96,7 @@ class Cuesheet:
         self.rems = dict()
         self.title = None
         self.performer = None
+        self.songwriter = None
         self.catalog = None
         self.files = OrderedDict()
 
@@ -108,7 +110,7 @@ class Cuesheet:
             If None, then only file named as default name (CDImage.wav) will be merged.
         '''
         # merge simple fields
-        for key in ['title', 'performer', 'catalog']:
+        for key in ['title', 'performer', 'catalog', 'songwriter']:
             new_value = getattr(cuesheet, key, None)
             old_value = getattr(self, key, None)
             if (overwrite and new_value) or (not overwrite and not old_value):
@@ -280,6 +282,8 @@ class Cuesheet:
                     cue.title = value.strip().strip('"')
                 elif field == "PERFORMER":
                     cue.performer = value.strip().strip('"')
+                elif field == "SONGWRITER":
+                    cue.songwriter = value.strip().strip('"')
                 elif field == "CATALOG":
                     cue.catalog = value.strip()
                 elif field == "FILE":
@@ -314,10 +318,12 @@ class Cuesheet:
         lines = []
         for field, value in self.rems.items():
             lines.append(f'REM {field} {value}')
-        if self.title is not None:
+        if self.title:
             lines.append(f'TITLE "{self.title}"')
-        if self.performer is not None:
+        if self.performer:
             lines.append(f'PERFORMER "{self.performer}"')
+        if self.songwriter:
+            lines.append(f'SONGWRITER "{self.songwriter}"')
         for file, tracks in self.files.items():
             lines.append(f'FILE "{file}" WAVE')
             sorted_tracks = list(tracks.items())

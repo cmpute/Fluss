@@ -162,8 +162,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._shared_states.hovered = self.currentOutputList[index.row()]
         self.refreshInputBgcolor()
         self.refreshOutputBgcolor()
-        if not self._enable_cross_selection:
-            self.list_input_files.clearSelection()
 
     def updateSelectedFolder(self, index: int):
         if self.tab_folders.count() == 0: # happens when reset
@@ -201,6 +199,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             target_meta.ripper = self.txt_ripper.text()
             target_meta.comment = self.txt_comment.toPlainText()
 
+    def listOutputViewEnter(self, event):
+        if not self._enable_cross_selection:
+            self.list_input_files.clearSelection()
+
     def listOutputViewLeave(self, event):
         self._shared_states.hovered = None
         self.refreshInputBgcolor()
@@ -215,6 +217,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         listview.setModel(TargetListModel(listview, self._network, self._shared_states))
         listview.pressed.connect(self.updateSelectedOutput)
         listview.entered.connect(self.updateHighlightOutput)
+        listview.enterEvent = self.listOutputViewEnter
         listview.leaveEvent = self.listOutputViewLeave
         listview.setContextMenuPolicy(Qt.CustomContextMenu)
         listview.customContextMenuRequested.connect(lambda pos: self.outputContextMenu(listview, pos))
@@ -232,7 +235,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def updateFolderNames(self):
         # update valid folder names
-        valid_folders = ['CD', 'BK', 'DVD', 'DL', 'OL', 'MISC', 'PHOTO', 'LRC']
+        valid_folders = ['CD', 'BK', 'DVD', 'DL', 'OL', 'BD', 'MISC', 'PHOTO', 'LRC']
         for i in range(self.tab_folders.count()):
             valid_folders.remove(self.tab_folders.tabText(i))
         self.txt_folder_name.clear()

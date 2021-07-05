@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path, PurePath
 from typing import Callable, List, Union
 from io import BytesIO
@@ -108,7 +109,9 @@ class CopyTarget(OrganizeTarget):
         return "<CopyTarget output=%s>" % self.output_name
 
     async def apply(self, input_root, output_root):
-        copy(Path(input_root, self._input[0]), Path(output_root, self._outname))
+        def task(): # prevent copying large file from blocking main thread
+            copy(Path(input_root, self._input[0]), Path(output_root, self._outname))
+        await asyncio.get_running_loop().run_in_executor(None, task)
 
     async def apply_stream(self, input_root, output_root):
         return BytesIO(Path(input_root, self._input[0]).read_bytes())
@@ -262,13 +265,14 @@ class MergeTracksTarget(OrganizeTarget):
         return "<MergeTracksTarget output=%s>" % self.output_name
 
     async def apply(self, input_root, output_root, progress_callback: Callable[[float], None] = None):
-        if isinstance(self._cover, str):
-            cover_path = Path(input_root, self._cover)
-        elif isinstance(self._cover, OrganizeTarget):
-            cover_path = Path(output_root, self._cover.output_name)
-        else:
-            raise ValueError("Unrecognized cover input!")
-        self._meta.cover = cover_path.read_bytes()
+        if self._cover:
+            if isinstance(self._cover, str):
+                cover_path = Path(input_root, self._cover)
+            elif isinstance(self._cover, OrganizeTarget):
+                cover_path = Path(output_root, self._cover.output_name)
+            else:
+                raise ValueError("Unrecognized cover input!")
+            self._meta.cover = cover_path.read_bytes()
 
         if len(self._tracks) == 1:
             await convert_track(

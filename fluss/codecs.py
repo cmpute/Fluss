@@ -2,13 +2,15 @@
 async decoding will use temp file to store results first due to performance issue of Python pipe and qasync (see https://github.com/CabbageDevelopment/qasync/issues/43)
 '''
 
+# TODO: check return code for all encoders
+
 import asyncio
 import io
 import re
 import subprocess
 import wave
 import tempfile
-from tempfile import mkstemp, TemporaryDirectory, TemporaryFile
+from tempfile import TemporaryDirectory, TemporaryFile
 from pathlib import Path
 from typing import Any, Callable, List, Type, Union, Coroutine
 import logging
@@ -179,9 +181,11 @@ class flac(AudioCodec):
         proc.stdin.close()
 
         if progress_callback is not None:
-            await asyncio.gather(ptask, proc.wait())
+            _, retcode = await asyncio.gather(ptask, proc.wait())
         else:
-            await proc.wait()
+            retcode = await proc.wait()
+        if retcode != 0:
+            raise RuntimeError("flac encoder returns %d" % retcode)
 
         _logger.info("Encoding %s done")
 
@@ -210,9 +214,11 @@ class flac(AudioCodec):
                                                 linesep=b'\b')
 
         if progress_callback is not None:
-            await asyncio.gather(ptask, proc.wait())
+            _, retcode = await asyncio.gather(ptask, proc.wait())
         else:
-            await proc.wait()
+            retcode = await proc.wait()
+        if retcode != 0:
+            raise RuntimeError("flac decoder returns %d" % retcode)
 
         buf = ftmp.read_bytes()
         ftmp.unlink()
@@ -259,9 +265,11 @@ class wavpack(AudioCodec):
         proc.stdin.close()
 
         if progress_callback is not None:
-            await asyncio.gather(ptask, proc.wait())
+            _, retcode = await asyncio.gather(ptask, proc.wait())
         else:
-            await proc.wait()
+            retcode = await proc.wait()
+        if retcode != 0:
+            raise RuntimeError("wavpack encoder returns %d" % retcode)
 
     def decode(self, fin: str) -> wave.Wave_read:
         proc = subprocess.Popen([C.path.wvunpack, '-yq', _resolve_pathstr(fin), "-"], stdout=subprocess.PIPE)
@@ -288,9 +296,11 @@ class wavpack(AudioCodec):
                                                  linesep=b'...')
 
         if progress_callback is not None:
-            await asyncio.gather(ptask, proc.wait())
+            _, retcode = await asyncio.gather(ptask, proc.wait())
         else:
-            await proc.wait()
+            retcode = await proc.wait()
+        if retcode != 0:
+            raise RuntimeError("wavpack decoder returns %d" % retcode)
 
         buf = ftmp.read_bytes()
         _logger.info("Decoding %s done", fin)
@@ -408,9 +418,11 @@ class trueaudio(AudioCodec):
         proc.stdin.close()
 
         if progress_callback is not None:
-            await asyncio.gather(ptask, proc.wait())
+            _, retcode = await asyncio.gather(ptask, proc.wait())
         else:
-            await proc.wait()
+            retcode = await proc.wait()
+        if retcode != 0:
+            raise RuntimeError("trueaudio encoder returns %d" % retcode)
 
     def decode(self, fin: str) -> wave.Wave_read:
         proc = subprocess.Popen([C.path.tta, "-d", _resolve_pathstr(fin), '-'], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -432,9 +444,11 @@ class trueaudio(AudioCodec):
                                                  linesep=b'\r')
 
         if progress_callback is not None:
-            await asyncio.gather(ptask, proc.wait())
+            _, retcode = await asyncio.gather(ptask, proc.wait())
         else:
-            await proc.wait()
+            retcode = await proc.wait()
+        if retcode != 0:
+            raise RuntimeError("trueaudio decoder returns %d" % retcode)
 
         buf = ftmp.read_bytes()
         ftmp.unlink()
@@ -475,9 +489,11 @@ class tak(AudioCodec):
         proc.stdin.close()
 
         if progress_callback is not None:
-            await asyncio.gather(ptask, proc.wait())
+            _, retcode = await asyncio.gather(ptask, proc.wait())
         else:
-            await proc.wait()
+            retcode = await proc.wait()
+        if retcode != 0:
+            raise RuntimeError("tak encoder returns %d" % retcode)
 
     def decode(self, fin: str) -> wave.Wave_read:
         proc = subprocess.Popen([C.path.takc, "-d", "-silent", "-overwrite", _resolve_pathstr(fin), '-'],
@@ -500,9 +516,11 @@ class tak(AudioCodec):
                                                  linesep=b'.')
 
         if progress_callback is not None:
-            await asyncio.gather(ptask, proc.wait())
+            _, retcode = await asyncio.gather(ptask, proc.wait())
         else:
-            await proc.wait()
+            retcode = await proc.wait()
+        if retcode != 0:
+            raise RuntimeError("tak decoder returns %d" % retcode)
 
         buf = ftmp.read_bytes()
         ftmp.unlink()
@@ -544,9 +562,11 @@ class alac(AudioCodec):
         proc.stdin.close()
 
         if progress_callback is not None:
-            await asyncio.gather(ptask, proc.wait())
+            _, retcode = await asyncio.gather(ptask, proc.wait())
         else:
-            await proc.wait()
+            retcode = await proc.wait()
+        if retcode != 0:
+            raise RuntimeError("alac encoder returns %d" % retcode)
 
     def decode(self, fin: str) -> wave.Wave_read:
         proc = subprocess.Popen([C.path.refalac, "-s", "-D", _resolve_pathstr(fin), "-o", "-"],
@@ -569,9 +589,11 @@ class alac(AudioCodec):
                                                  linesep=b'\r')
 
         if progress_callback is not None:
-            await asyncio.gather(ptask, proc.wait())
+            _, retcode = await asyncio.gather(ptask, proc.wait())
         else:
-            await proc.wait()
+            retcode = await proc.wait()
+        if retcode != 0:
+            raise RuntimeError("alac decoder returns %d" % retcode)
 
         buf = ftmp.read_bytes()
         ftmp.unlink()
