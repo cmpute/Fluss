@@ -69,6 +69,11 @@ async def merge_tracks(files_in: List[Union[str, Path]],
     elif isinstance(cuesheet, (str, Path)):
         cuesheet = Cuesheet.from_file(cuesheet)
 
+    # determine if we need to infer cuesheet offset
+    if not (len(cuesheet.files) <= 1 or len(cuesheet.files) == len(files_in)):
+        raise SyntaxError("Doesn't support non-trivial match between audio files and cuesheet")
+    combine_cuesheet = len(cuesheet.files) == len(files_in) and len(files_in) > 1
+
     # merge audio structures
     tracks = {}
     for file_tracks in cuesheet.files.values():
@@ -112,17 +117,18 @@ async def merge_tracks(files_in: List[Union[str, Path]],
             wave_in = asyncio.ensure_future(icodec.decode_async(file,
                 progress_callback=progress_updater.get_updater(idx)))
             streams.append(wave_in)
-        if cur_track.index00 is not None:
-            if cur_track.index00 >= 0:
-                cur_track.index00 += offset
+        if combine_cuesheet:
+            if cur_track.index00 is not None:
+                if cur_track.index00 >= 0:
+                    cur_track.index00 += offset
+                else:
+                    if last_length is None:
+                        raise SyntaxError("Cannot parse noncompliant pregap in the first track!")
+                    cur_track.index00 = (offset - last_length) + -cur_track.index00
+            if cur_track.index01 is None:
+                cur_track.index01 = offset
             else:
-                if last_length is None:
-                    raise SyntaxError("Cannot parse noncompliant pregap in the first track!")
-                cur_track.index00 = (offset - last_length) + -cur_track.index00
-        if cur_track.index01 is None:
-            cur_track.index01 = offset
-        else:
-            cur_track.index01 += offset
+                cur_track.index01 += offset
 
         # process postgap
         if cur_track.postgap is not None:

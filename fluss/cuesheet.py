@@ -209,9 +209,7 @@ class Cuesheet:
                 return None
             tags_upper = {k.upper(): v.value for k, v in tag.tags.items() if isinstance(v, APETextValue)}
         elif isinstance(tag, ID3TagFiles):
-            if not tag.tags:
-                return None
-            raise NotImplementedError()
+            return None  # TODO: implement
         elif isinstance(tag, MP4):
             return None  # it seems that MP4 doesn't support embedded cuesheet
         else:

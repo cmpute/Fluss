@@ -333,7 +333,7 @@ class TrackTableModel(QAbstractTableModel):
                             if i+2 in tracks: # track number in cuesheet starts from 1
                                 l = CuesheetTrack.duration(tracks[i+1], tracks[i+2]) / 75
                             else:
-                                l = self._track_length[0] - tracks[i+1].index01 / 75
+                                l = sum(self._track_length) - tracks[i+1].index01 / 75
                         elif len(self._meta.cuesheet.files) == len(self._track_length):
                             fileitem = self._meta.cuesheet.files[self._sorted_cue_files[i]]
                             index01 = fileitem[i+1].index01

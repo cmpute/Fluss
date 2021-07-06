@@ -111,8 +111,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         datestr = self.txt_date.text() or self.txt_date.placeholderText()
         if datestr:
-            date = date_parse(datestr)
-            yymmdd = date.strftime("%y%m%d")
+            try:
+                x = int(datestr)
+                not_complete = True
+            except:
+                not_complete = False
+            
+            if not not_complete:
+                date = date_parse(datestr)
+                yymmdd = date.strftime("%y%m%d")
+            else:
+                yymmdd = ""
         else:
             yymmdd = ""
         partnumbers = [f.partnumber for f in self._meta.folders.values() if f.partnumber]

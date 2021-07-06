@@ -545,7 +545,7 @@ class DiscMeta:
             gen.files[_default_cuesheet_file][track_idx + 1] = cuetrack
 
         if self._cuesheet is not None:
-            gen.update(self._cuesheet)
+            gen.update(self._cuesheet, overwrite=False)
 
         return gen
 
