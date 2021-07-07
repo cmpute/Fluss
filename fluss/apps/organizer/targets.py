@@ -485,7 +485,7 @@ class VerifyAccurateRipTarget(OrganizeTarget):
             msgbox = QMessageBox()
             msgbox.setWindowTitle("Verify failed")
             msgbox.setIcon(QMessageBox.Critical)
-            msgbox.setText("AccurateRip verification failed! Please check the output file " + self.output_name)
+            msgbox.setText("AccurateRip verification failed! Please check the output file " + str(Path(output_root, self.output_name)))
             msgbox.exec_()
 
         return BytesIO(results)

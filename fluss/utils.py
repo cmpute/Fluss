@@ -72,7 +72,7 @@ async def merge_tracks(files_in: List[Union[str, Path]],
     # determine if we need to infer cuesheet offset
     if not (len(cuesheet.files) <= 1 or len(cuesheet.files) == len(files_in)):
         raise SyntaxError("Doesn't support non-trivial match between audio files and cuesheet")
-    combine_cuesheet = len(cuesheet.files) == len(files_in) and len(files_in) > 1
+    combine_cuesheet = (len(cuesheet.files) == 0) or (len(cuesheet.files) == len(files_in) and len(files_in) > 1)
 
     # merge audio structures
     tracks = {}
