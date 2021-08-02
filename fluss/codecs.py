@@ -6,7 +6,7 @@ async decoding will use temp file to store results first due to performance issu
 
 import asyncio
 import io
-from os import name
+import stat
 import re
 import subprocess
 import wave
@@ -100,12 +100,12 @@ class AudioCodec:
                     callback(cumulate)
                 else:
                     callback(convert(match[0]))
-        return b"".join(lines).decode("utf-8")
+        return b"".join(lines)
 
     def _assert_retcode(self, name, retcode, output_msg=None):
         if retcode != 0:
             if output_msg:
-                _logger.error("%s returns %d, output message: %s", name, retcode, output_msg)
+                _logger.error("%s returns %d, output message: %s", name, retcode, repr(output_msg))
             else:
                 _logger.error("%s returns %d", name, retcode)
             raise RuntimeError(f"{name} returns {retcode}, see log for full output")
@@ -231,6 +231,7 @@ class flac(AudioCodec):
         self._assert_retcode("flac decoder", retcode, stderr_msg)
 
         buf = ftmp.read_bytes()
+        ftmp.chmod(stat.S_IWUSR)  # sometimes the output file happens to be readonly ...
         ftmp.unlink()
 
         _logger.info("Decoding %s done")

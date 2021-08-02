@@ -299,13 +299,13 @@ class DiscMeta:
             meta.date = mp4_meta.tags["\xa9day"][0]
 
         # parse disc numbers
-        discnum_tuple: Tuple[int, int] = mp4_meta.tags.get("disk", None)
-        if discnum_tuple:
+        if "disk" in mp4_meta.tags:
+            discnum_tuple: Tuple[int, int] = mp4_meta.tags["disk"][0]
             meta.discnumber = discnum_tuple[0]
 
         # parse track numbers
-        track_idx_tuple: Tuple[int, int] = mp4_meta.tags.get("trkn", None)
-        if track_idx_tuple: # This is an mp4 file for single track
+        if "trkn" in mp4_meta.tags: # This is an mp4 file for single track
+            track_idx_tuple: Tuple[int, int] = mp4_meta.tags["trkn"][0]
             track_idx = track_idx_tuple[0] - 1
             reserved_idx = track_idx
             meta._reserve_tracks(reserved_idx)
@@ -350,7 +350,11 @@ class DiscMeta:
         # parse disc numbers
         discnum_str = get_first('TPOS')
         if discnum_str:
-            meta.discnumber = int(discnum_str)
+            if '/' in discnum_str:
+                idx_str, total_str = discnum_str.rsplit('/')
+                meta.discnumber = int(idx_str)
+            else:
+                meta.discnumber = int(discnum_str)
 
         # parse track numbers
         track_idx_str = get_first('TRCK')

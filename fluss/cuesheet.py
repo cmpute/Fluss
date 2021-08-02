@@ -292,7 +292,7 @@ class Cuesheet:
                     # start parsing new file
                     cur_tracks.clear()
                     _, cur_file, file_type = value.split('"')
-                    if file_type.strip() != "WAVE":
+                    if file_type.strip().upper() != "WAVE":
                         raise SyntaxError("Unsupported media type: %s!" % file_type)
                 else:
                     raise SyntaxError("Unrecognized line: " + repr(line))

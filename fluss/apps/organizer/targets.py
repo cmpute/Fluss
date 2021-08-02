@@ -16,7 +16,7 @@ from fluss.utils import merge_tracks, convert_track
 from fluss.accurip import verify_accurip, parse_accurip
 
 # readable suffixes supported by pillow
-PILLOW_SUFFIXES = ['png', 'jpg', 'jpeg', 'bmp', 'tiff']
+PILLOW_SUFFIXES = ['png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif']
 _image_suffix_from_format = {
     "jpeg": "jpg",
     "png": "png",

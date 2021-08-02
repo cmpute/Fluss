@@ -141,7 +141,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         name = name.replace("()", "").replace("[]", "")
         while "[(" in name:
             name = name.replace("[(", "(", 1).replace(")]", ")", 1)
-        name = name.replace(":", "：").replace("/", "／") # escape characters
+        name = name.replace(":", "：").replace("/", "／").replace("<", "＜").replace(">", "＞").replace("*", "＊") # escape characters
         return name.strip().rstrip('.')  # directory with trailing dot is not supported by windows
 
     def listInputViewEnter(self, event):
