@@ -5,7 +5,7 @@ from typing import Dict, List, Set, Tuple
 import mutagen
 from mutagen import mp4
 from mutagen.apev2 import BINARY, TEXT, APEv2File, APEValue
-from mutagen.flac import FLAC, Picture
+from mutagen.flac import CueSheetTrack, FLAC, Picture
 from mutagen.id3 import ID3, ID3FileType, PictureType
 from mutagen.mp4 import MP4, MP4Cover
 from PIL import Image
@@ -251,7 +251,7 @@ class DiscMeta:
 
         # get cuesheet
         if flac_meta.cuesheet:
-            meta._cuesheet = Cuesheet.from_flac(flac_meta.cuesheet)
+            meta._cuesheet = Cuesheet.from_flac(flac_meta.cuesheet, flac_meta.info.sample_rate)
         if 'CUESHEET' in flac_tags:
             cs = Cuesheet.parse(get_first('CUESHEET'))
             if meta._cuesheet:
@@ -484,7 +484,8 @@ class DiscMeta:
 
         if self.cuesheet:
             if builtin_cuesheet:
-                flac_meta.cuesheet = self.cuesheet.to_flac()
+                flac_meta.cuesheet = self.cuesheet.to_flac(flac_meta.info.sample_rate)
+                flac_meta.cuesheet.tracks.append(CueSheetTrack(170, flac_meta.info.total_samples)) # lead-out
 
                 # save track-wise tags in foobar2000 style
                 tracks = next(iter(self.cuesheet.files.values()))

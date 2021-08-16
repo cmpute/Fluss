@@ -151,25 +151,29 @@ class Cuesheet:
                     self.files[file] = file_tracks
 
     @classmethod
-    def from_flac(cls, flac_cuesheet: flac.CueSheet) -> "Cuesheet":
+    def from_flac(cls, flac_cuesheet: flac.CueSheet, sample_rate: int) -> "Cuesheet":
         '''
         Update cuesheet structure from FLAC embedded cuesheet
         '''
         cue = cls()
         cue.catalog = flac_cuesheet.media_catalog_num
 
+        ratio = sample_rate // 75
+
         file = _default_cuesheet_file
         for track in flac_cuesheet.tracks:
+            if track.track_number >= 100: # these tracks are not actual tracks
+                continue
             cue.files[file][track.track_number] = CuesheetTrack()
             cue.files[file][track.track_number].isrc = track.isrc
             for index in track.indexes:
                 if index.index_number == 0:
-                    cue.files[file][track.track_number].index00 += track.start_offset + index.index_offset
+                    cue.files[file][track.track_number].index00 += (track.start_offset + index.index_offset) // ratio
                 elif index.index_number == 1:
-                    cue.files[file][track.track_number].index01 += track.start_offset + index.index_offset
+                    cue.files[file][track.track_number].index01 += (track.start_offset + index.index_offset) // ratio
         return cue
 
-    def to_flac(self) -> flac.CueSheet:
+    def to_flac(self, sample_rate: int) -> flac.CueSheet:
         '''
         Dump the cuesheet data to flac format
         '''
@@ -178,20 +182,22 @@ class Cuesheet:
         if len(self.files) > 1:
             raise ValueError("Only cuesheet with single file section is able to be converted to flac cuesheet!")
 
+        ratio = sample_rate // 75
+
         tracks = next(iter(self.files.values()))
         for i, track in tracks.items():
             indexes = []
             if track.index00 is not None:
-                start_offset = track.index00
+                start_offset = track.index00 * ratio
                 indexes.append(flac.CueSheetTrackIndex(0, 0))
                 if track.index01 is not None:
-                    indexes.append(flac.CueSheetTrackIndex(1, track.index01 - track.index00))
+                    indexes.append(flac.CueSheetTrackIndex(1, ratio * (track.index01 - track.index00)))
             elif track.index01 is not None:
-                start_offset = track.index01
+                start_offset = track.index01 * ratio
                 indexes.append(flac.CueSheetTrackIndex(1, 0))
 
             flac_track = flac.CueSheetTrack(i, start_offset)
-            flac_track.isrc = track.isrc
+            flac_track.isrc = track.isrc or ''
             flac_track.indexes.extend(indexes)
             cue.tracks.append(flac_track)
 
@@ -201,7 +207,7 @@ class Cuesheet:
     def from_mutagen(cls, tag: Union[flac.FLAC, FileType]) -> "Cuesheet":
         if isinstance(tag, flac.FLAC):
             if tag.cuesheet:
-                return cls.from_flac(tag.cuesheet)
+                return cls.from_flac(tag.cuesheet, tag.info.sample_rate)
             else:
                 tags_upper = {k.upper(): v[0] for k, v in tag.tags.items()}
         elif isinstance(tag, APETagFiles):
