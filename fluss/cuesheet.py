@@ -178,22 +178,22 @@ class Cuesheet:
         if len(self.files) > 1:
             raise ValueError("Only cuesheet with single file section is able to be converted to flac cuesheet!")
 
-        for f, tracks in self.files.items():
-            for i, track in tracks.items():
-                indexes = []
-                if track.index00 is not None:
-                    start_offset = track.index00
-                    indexes.append(flac.CueSheetTrackIndex(0, 0))
-                    if track.index01 is not None:
-                        indexes.append(flac.CueSheetTrackIndex(1, track.index01 - track.index00))
-                elif track.index01 is not None:
-                    start_offset = track.index01
-                    indexes.append(flac.CueSheetTrackIndex(1, 0))
+        tracks = next(iter(self.files.values()))
+        for i, track in tracks.items():
+            indexes = []
+            if track.index00 is not None:
+                start_offset = track.index00
+                indexes.append(flac.CueSheetTrackIndex(0, 0))
+                if track.index01 is not None:
+                    indexes.append(flac.CueSheetTrackIndex(1, track.index01 - track.index00))
+            elif track.index01 is not None:
+                start_offset = track.index01
+                indexes.append(flac.CueSheetTrackIndex(1, 0))
 
-                flac_track = flac.CueSheetTrack(i, start_offset)
-                flac_track.isrc = track.isrc
-                flac_track.indexes.extend(indexes)
-                cue.tracks.append(flac_track)
+            flac_track = flac.CueSheetTrack(i, start_offset)
+            flac_track.isrc = track.isrc
+            flac_track.indexes.extend(indexes)
+            cue.tracks.append(flac_track)
 
         return cue
 

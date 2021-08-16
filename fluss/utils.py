@@ -182,7 +182,8 @@ async def convert_track(file_in: Union[str, Path],
 
     if not dry_run:
         wave_in = await icodec.decode_async(file_in,
-            progress_callback=lambda p: progress_callback(p / 2))
+            progress_callback=lambda p: progress_callback(p / 2)
+            if progress_callback else None)
 
         # get absolute data
         buf = wave_in.getfp().file
@@ -194,5 +195,9 @@ async def convert_track(file_in: Union[str, Path],
             buf.close()
 
         await ocodec.encode_async(file_out, data,
-            progress_callback=lambda p: progress_callback(p / 2 + 0.5))
-        meta.to_mutagen(ocodec.mutagen(file_out))
+            progress_callback=lambda p: progress_callback(p / 2 + 0.5)
+            if progress_callback else None)
+
+        mutag = ocodec.mutagen(file_out)
+        meta.to_mutagen(mutag)
+        mutag.save()

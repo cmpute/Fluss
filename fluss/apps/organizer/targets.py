@@ -201,7 +201,9 @@ class MergeTracksTarget(OrganizeTarget):
                 nums.append(c)
             else:
                 break
-        lexical_name = chr(int(''.join(nums))) + name[i:] if nums else name
+
+        # cover prefix number (up to 256) to character for sorting
+        lexical_name = chr(int(''.join(nums)) % 0xff) + name[i:] if nums else name
         return lexical_name
 
     @staticmethod

@@ -201,7 +201,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self._meta:
             target_meta = self._meta.folders[self.tab_folders.tabText(index)]
             target_meta.catalog = self.txt_catalog.text()
-            target_meta.partnumber = self.txt_partnumber.text()
+            target_meta.partnumber = self.txt_partnumber.text() or self.txt_partnumber.placeholderText()
             target_meta.edition = self.txt_edition.text()
             target_meta.tool = self.txt_tool.text()
             target_meta.source = self.txt_source.text()

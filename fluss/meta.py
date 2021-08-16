@@ -280,6 +280,14 @@ class DiscMeta:
 
         raise NotImplementedError("Parsing metadata from APE tags is not implemented!")
 
+        meta = cls()
+        ape_tags = {k.upper(): v for k, v in ape_meta.tags.items()}
+
+        if 'CUESHEET' in ape_tags:
+            meta._cuesheet = Cuesheet.parse(ape_tags['CUESHEET'].value)
+
+        return meta
+
     @classmethod
     def from_mp4(cls, mp4_meta: MP4) -> "DiscMeta":
         '''
@@ -448,7 +456,10 @@ class DiscMeta:
     def full_artist(self) -> str:
         return ', '.join(self.artists) if self.artists else None
 
-    def to_flac(self, flac_meta: FLAC) -> None:
+    def to_flac(self, flac_meta: FLAC, builtin_cuesheet=False) -> None:
+        '''
+        :param builtin_cuesheet: Whether to use the cuesheet field builtin FLAC specs
+        '''
         def add_if_exist(obj, tag_key):
             if obj:
                 flac_meta.tags[tag_key] = obj
@@ -472,11 +483,18 @@ class DiscMeta:
             flac_meta.add_picture(pic)
 
         if self.cuesheet:
-            flac_meta.cuesheet = self.cuesheet.to_flac()
-            if self.cuesheet:
+            if builtin_cuesheet:
+                flac_meta.cuesheet = self.cuesheet.to_flac()
+
+                # save track-wise tags in foobar2000 style
+                tracks = next(iter(self.cuesheet.files.values()))
+                for i, track in tracks.items():
+                    add_if_exist(track.title, f'CUE_TRACK{i:02}_TITLE')
+                    add_if_exist(track.performer, f'CUE_TRACK{i:02}_PERFORMER')
+            else:
                 flac_meta.tags['CUESHEET'] = str(self.cuesheet)
-                add_if_exist(self.cuesheet.catalog, 'Catalog')
-                add_if_exist(self.cuesheet.rems.get('COMMENT', None), 'Comment')
+            add_if_exist(self.cuesheet.catalog, 'Catalog')
+            add_if_exist(self.cuesheet.rems.get('COMMENT', None), 'Comment')
 
         flac_meta.save()
 
